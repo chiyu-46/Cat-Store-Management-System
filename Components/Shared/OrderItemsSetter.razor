@@ -1,0 +1,45 @@
+﻿@using CatStore.Models
+@typeparam T where T : CatStore.Models.OrderItemBase
+
+<MudText Typo="Typo.h6">订单内容</MudText>
+
+<MudPaper Class="d-flex flex-column flex-grow-1 gap-4" Elevation="0">
+    @foreach (var item in Items)
+    {
+        @* 徽章 *@
+        <MudBadge @key="item" Overlap="true" OnClick="() => RemoveItem(item)" Icon="@Icons.Material.Filled.Close"
+                  Color="Color.Error">
+            @* 卡片 *@
+            <MudPaper Class="d-flex flex-grow-1 gap-4 pa-4">
+                @OrderItemTemplate(item)
+            </MudPaper>
+        </MudBadge>
+    }
+
+    <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="AddNewItem">
+        添加
+    </MudButton>
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public RenderFragment<T> OrderItemTemplate { get; set; } = default!;
+
+    [Parameter, EditorRequired] public ICollection<T> Items { get; set; } = default!;
+
+    [Parameter] public EventCallback<ICollection<T>> ItemsChanged { get; set; }
+
+    private async Task AddNewItem()
+    {
+        var newItem = Activator.CreateInstance<T>();
+        newItem.Commodity = new Commodity();
+        Items.Add(newItem);
+        await ItemsChanged.InvokeAsync(Items); // 添加新项后触发事件
+    }
+
+    private async Task RemoveItem(T item)
+    {
+        Items.Remove(item);
+        await ItemsChanged.InvokeAsync(Items); // 移除项后触发事件
+    }
+
+}

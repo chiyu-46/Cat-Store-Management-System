@@ -1,0 +1,185 @@
+﻿@using Microsoft.EntityFrameworkCore
+@using CatStore.Models
+@using CatStore.Data
+@using CatStore.Components.Shared
+@inject ISnackbar Snackbar
+
+<EditForm Model="@order" OnValidSubmit="() => IsCreate? AddOrder():UpdateOrder()"
+          FormName="create-purchase-order" Enhance>
+    <DataAnnotationsValidator/>
+    <MudDialog>
+        <TitleContent>
+            <MudText>
+                <MudIcon Icon="@Icons.Material.Outlined.Add" Class="mr-3 mb-n1"/>
+                @(IsCreate ? "添加新订单" : "修改订单")
+            </MudText>
+        </TitleContent>
+        <DialogContent>
+            @* 不应允许修改订单时间 *@
+            <MudTextField Label="供货商电话" @bind-Value="order.SupplierPhone" For="@(() => order.SupplierPhone)"/>
+            <MudNumericField Label="总金额" @bind-Value="order.TotalAmount" For="() => order.TotalAmount"
+                             Variant="Variant.Text" Min="0M"/>
+            @* 订单项设置器 *@
+            <OrderItemsSetter T="PurchaseOrderItem" @bind-Items="order.PurchaseOrderItems" Context="orderItem">
+                <OrderItemTemplate>
+                    <MudAutocomplete Label="商品名" T="Commodity" @bind-Value="orderItem.Commodity"
+                                     Required="true"
+                                     SearchFunc="SearchCommodityInfo" ToStringFunc="@(x => x!.Name)"
+                                     CoerceText="true" ResetValueOnEmptyText="false"
+                                     ShowProgressIndicator="true" ProgressIndicatorColor="Color.Default"
+                                     Strict="false" Class="flex-1 d-flex"/>
+                    <MudNumericField Label="数量" @bind-Value="orderItem.Quantity" For="() => orderItem.Quantity"
+                                     Variant="Variant.Text" Min="0"
+                                     Class="flex-1 d-flex"/>
+                </OrderItemTemplate>
+            </OrderItemsSetter>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="Cancel">取消</MudButton>
+            <MudButton ButtonType="ButtonType.Submit" Color="Color.Success">@(IsCreate ? "添加" : "更新")</MudButton>
+        </DialogActions>
+    </MudDialog>
+</EditForm>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public CatStoreContext dbContext { get; set; } = default!;
+
+    [Parameter] public bool IsCreate { get; set; }
+
+    [Parameter] public int OrderId { get; set; }
+
+    // 代表表单中的数据
+    private PurchaseOrder order { get; set; } = new()
+    {
+        SupplierPhone = "",
+        TransactionTime = DateTime.Now, 
+        PurchaseOrderItems = new List<PurchaseOrderItem>()
+    };
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        if (!IsCreate)
+        {
+            // 加载要修改的订单
+            order = (from purchaseOrder in dbContext.PurchaseOrder
+                    where purchaseOrder.OrderId == OrderId
+                    select purchaseOrder)
+                .Include(o => o.PurchaseOrderItems)
+                .ThenInclude(o => o.Commodity)
+                .First();
+            // 恢复所有商品的库存数量，在订单修改后，重新加回库存数量
+            foreach (var orderOrderItem in order.PurchaseOrderItems)
+            {
+                orderOrderItem.Commodity.QuantityInStock -= orderOrderItem.Quantity;
+            }
+        }
+        else
+        {
+            // 提交订单到数据库，开启对订单的追踪
+            dbContext.PurchaseOrder.Add(order);
+            
+            // 初始化创建的订单（包含一件初始商品）
+            order.PurchaseOrderItems.Add(new PurchaseOrderItem()
+            {
+                Commodity = new Commodity()
+            });
+        }
+    }
+
+    /// <summary>
+    /// 如果用户在修改订单时选择取消，则清除追踪的所有实体
+    /// </summary>
+    private void Cancel()
+    {
+        if (!IsCreate) dbContext.ChangeTracker.Clear();
+        MudDialog.Cancel();
+    }
+
+    /// <summary>
+    /// 清理订单中数量为零的订单项。
+    /// </summary>
+    private void ClearZeroQuantityOrderItems()
+    {
+        var items = order.PurchaseOrderItems.Where(item => item.Quantity <= 0).ToList();
+        foreach (var item in items)
+        {
+            order.PurchaseOrderItems.Remove(item);
+        }
+    }
+    
+    /// <summary>
+    /// 在新增或修改订单时，增加订单中对应商品的库存数量。
+    /// </summary>
+    private void IncreaseFromStock()
+    {
+        foreach (var item in order.PurchaseOrderItems)
+        {
+            item.Commodity.QuantityInStock += item.Quantity;
+        }
+    }
+
+    /// <summary>
+    /// 添加订单到数据库，显示结果信息，并关闭本对话框。
+    /// </summary>
+    private async Task AddOrder()
+    {
+        ClearZeroQuantityOrderItems();
+        IncreaseFromStock();
+        // dbContext.ChangeTracker.DetectChanges();
+        // Console.WriteLine("------------------2---------------------");
+        // Console.WriteLine(dbContext.ChangeTracker.DebugView.LongView);
+        // Console.WriteLine("------------------*2*---------------------");
+        await dbContext.SaveChangesAsync();
+        Snackbar.Add("订单添加成功！", Severity.Success);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    /// <summary>
+    /// 修改订单。
+    /// </summary>
+    private async Task UpdateOrder()
+    {
+        ClearZeroQuantityOrderItems();
+        IncreaseFromStock();
+        await dbContext.SaveChangesAsync();
+        Snackbar.Add("订单修改成功！", Severity.Success);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    /// <summary>
+    /// 获取在当前创建或修改的订单中的所有商品列表。
+    /// </summary>
+    /// <returns>在当前创建或修改的订单中的所有商品列表。</returns>
+    private List<Commodity> GetCommoditiesInCurrentOrder()
+    {
+        return order.PurchaseOrderItems.Select(item => item.Commodity).ToList();
+    }
+    
+    /// <summary>
+    /// 搜索名字中包含 value 的商品信息。
+    /// </summary>
+    /// <param name="value">商品名包含的字符。</param>
+    /// <param name="token">取消令牌。</param>
+    /// <returns>所有符合条件的商品信息。</returns>
+    private async Task<IEnumerable<Commodity>> SearchCommodityInfo(string value, CancellationToken token)
+    {
+        var commoditiesInCurrentOrder = GetCommoditiesInCurrentOrder();
+        if (string.IsNullOrEmpty(value))
+        {
+            return await dbContext.Commodity
+                .Where(item => !commoditiesInCurrentOrder.Contains(item))
+                .Take(10)
+                .ToListAsync(token);
+        }
+
+        return await dbContext.Commodity
+            .Where(c => c.Name!.Contains(value))
+            .Where(item => !commoditiesInCurrentOrder.Contains(item))
+            .Take(10)
+            .ToListAsync(token);
+    }
+
+}

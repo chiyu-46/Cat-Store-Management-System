@@ -1,0 +1,196 @@
+@page "/cat-infos"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using CatStore.Models
+@using CatStore.Data
+@implements IAsyncDisposable
+@inject IDbContextFactory<CatStoreContext> DbFactory
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>猫咪信息管理</PageTitle>
+
+<MudDataGrid T="CatInfo" Items="dbContext.CatInfo" ReadOnly="readOnly" EditMode="DataGridEditMode.Form"
+             EditTrigger="DataGridEditTrigger.Manual" StartedEditingItem="StartedEditingItem"
+             CanceledEditingItem="CanceledEditingItem" CommittedItemChanges="CommittedItemChangesAsync"
+             Striped="true" Elevation="5" Class="ma-4 pa-4">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">猫咪信息管理</MudText>
+        <MudSpacer/>
+        <MudButton @onclick="AddCatInfoAsync" Variant="Variant.Filled" Color="Color.Success">添加新猫咪</MudButton>
+    </ToolBarContent>
+    <Columns>
+        <PropertyColumn Property="catInfo => catInfo.Name" Title="名字"/>
+        <PropertyColumn Property="catInfo => catInfo.GetNaturalGender()" Title="性别">
+            <EditTemplate>
+                <MudSelect @bind-Value="context.Item.Gender" Label="性别" Required RequiredError="必须选择性别！">
+                    <MudSelectItem Value="true">@CatInfo.ConvertGenderToNaturalLanguage(true)</MudSelectItem>
+                    <MudSelectItem Value="false">@CatInfo.ConvertGenderToNaturalLanguage(false)</MudSelectItem>
+                </MudSelect>
+            </EditTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="catInfo => catInfo.GetNaturalCatBreed()" Title="品种">
+            <EditTemplate>
+                <MudSelect @bind-Value="context.Item.CatBreed" Label="品种" Required RequiredError="必须选择品种！">
+                    @foreach (CatBreed item in Enum.GetValues(typeof(CatBreed)))
+                    {
+                        <MudSelectItem Value="@item">@CatInfo.ConvertCatBreedToNaturalLanguage(item)</MudSelectItem>
+                    }
+                </MudSelect>
+            </EditTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="catInfo => catInfo.Birthday" Title="出生日">
+            <EditTemplate>
+                <MudDatePicker @bind-Date="context.Item.BirthdayWithTime" Label="出生日" MaxDate="DateTime.Now"
+                               Required
+                               RequiredError="必须指定出生日！"
+                               Validation="@(new Func<DateTime?, IEnumerable<string>>(CatInfo.ValidateBirthday))"/>
+            </EditTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="catInfo => catInfo.GetNaturalCatState()" Title="状态">
+            <EditTemplate>
+                <MudSelect @bind-Value="context.Item.CatState" Label="状态" Required
+                           ReadOnly="true" HelperText="只能通过订单管理修改此信息">
+                    @foreach (CatState item in Enum.GetValues(typeof(CatState)))
+                    {
+                        <MudSelectItem Value="@item">@CatInfo.ConvertCatStateToNaturalLanguage(item)</MudSelectItem>
+                    }
+                </MudSelect>
+            </EditTemplate>
+        </PropertyColumn>
+        <TemplateColumn>
+            <CellTemplate>
+                <MudStack Row>
+                    <MudIconButton Size="@Size.Small" Icon="@Icons.Material.Outlined.Edit" Disabled="readOnly"
+                                   OnClick="@context.Actions.StartEditingItemAsync"/>
+                    <MudIconButton Size="@Size.Small" Icon="@Icons.Material.Outlined.DeleteForever" Disabled="readOnly"
+                                   OnClick="@(() => OnDeleteButtonClickedAsync(context.Item))"/>
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <PagerContent>
+        <MudDataGridPager T="CatInfo" PageSizeOptions="@(new[] { 5, 10, 20 })"/>
+    </PagerContent>
+</MudDataGrid>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? authenticationState { get; set; }
+    
+    private CatStoreContext dbContext = default!;
+
+    // 此表格是否只读。
+    // 可用于根据授权确定用户是否有权限更改此表格内容。
+    // 可以使用 Editable 属性，控制单独的列是否可编辑。
+    private bool readOnly = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        dbContext = await DbFactory.CreateDbContextAsync();
+        if (authenticationState is not null)
+        {
+            var authState = await authenticationState;
+            var user = authState?.User;
+
+            if (user is not null)
+            {
+                if (user.IsInRole("salesman"))
+                {
+                    readOnly = true;
+                }
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync() => await dbContext.DisposeAsync();
+
+    /// <summary>
+    /// 用户开始对表格中某条信息的编辑时，触发此事件。
+    /// </summary>
+    /// <param name="item">正在被用户编辑的这条信息。</param>
+    private void StartedEditingItem(CatInfo item)
+    {
+    }
+
+    /// <summary>
+    /// 用户取消对表格中某条信息的编辑时，触发此事件。
+    /// </summary>
+    /// <param name="item">正在被用户编辑的这条信息。</param>
+    private void CanceledEditingItem(CatInfo item)
+    {
+    }
+
+    /// <summary>
+    /// 用户提交对表格中某条信息的编辑时，触发此事件。
+    /// </summary>
+    /// <param name="item">正在被用户编辑的这条信息。</param>
+    private async Task CommittedItemChangesAsync(CatInfo item)
+    {
+        // // 用于显示 EF Core 对实体的状态跟踪
+        // dbContext.ChangeTracker.DetectChanges();
+        // Console.WriteLine(dbContext.ChangeTracker.DebugView.LongView);
+        try
+        {
+            await dbContext.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            Snackbar.Add("要修改的原信息不存在！", Severity.Error);
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// 当用户点击删除按钮时触发，用于弹出删除确认对话框。
+    /// </summary>
+    /// <param name="item">要删除的一条数据。</param>
+    private async Task OnDeleteButtonClickedAsync(CatInfo? item)
+    {
+        string msg = item!.CatState == CatState.Sold ? "删除此项将导致与其关联的猫咪订单被同时删除，请确认是否执行！" : "删除后无法恢复！";
+        bool? result = await DialogService.ShowMessageBox(
+            "警告",
+            msg,
+            yesText: "删除！", cancelText: "取消");
+        if (result is true)
+        {
+            if (item != null)
+            {
+                dbContext.CatInfo.Remove(item);
+                try
+                {
+                    await dbContext.SaveChangesAsync();
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    Snackbar.Add("原信息不存在！", Severity.Error);
+                }
+                finally
+                {
+                    StateHasChanged();
+                }
+            }
+            else
+            {
+                Snackbar.Add("原信息不存在！", Severity.Error);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 显示添加猫咪对话框。
+    /// </summary>
+    private async Task AddCatInfoAsync()
+    {
+        var dialog = await DialogService.ShowAsync<CreateCatInfo>("添加新猫咪");
+        var result = await dialog.Result;
+
+        if (!result!.Canceled)
+        {
+            StateHasChanged();
+        }
+    }
+
+}

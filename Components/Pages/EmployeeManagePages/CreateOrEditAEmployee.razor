@@ -1,0 +1,333 @@
+﻿@using System.Text.RegularExpressions
+@using CatStore.Models
+@using CatStore.Data
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.IdentityModel.Tokens
+@inject ISnackbar Snackbar
+@inject ILogger<CreateOrEditAEmployee> Logger
+
+<MudForm Model="UserDto" @bind-IsValid="isSuccess">
+    <MudDialog>
+        <TitleContent>
+            <MudText>
+                <MudIcon Icon="@Icons.Material.Outlined.Add" Class="mr-3 mb-n1"/>
+                @(IsCreate ? "添加员工" : "修改员工信息")
+            </MudText>
+        </TitleContent>
+        <DialogContent>
+            <MudTextField T="string" Label="用户名" Required="true" RequiredError="用户名是必需的！"
+                          HelperText="只能输入字母和数字" @bind-Value="UserDto.UserName"
+                          Validation="@(new Func<string, IEnumerable<string>>(UsernameValidation))"/>
+            <MudTextField T="string" Label="昵称" Required="true" RequiredError="昵称是必需的！"
+                          @bind-Value="UserDto.Nickname"
+                          Validation="@(new Func<string, IEnumerable<string>>(NicknameValidation))"/>
+            <MudTextField T="string" Label="手机号码" Required="true" RequiredError="手机号码是必需的！"
+                          @bind-Value="UserDto.PhoneNumber" InputType="InputType.Telephone"
+                          Validation="@(new Func<string, IEnumerable<string>>(ValidatePhoneNumber))"/>
+            @if (IsCreate)
+            {
+                <MudTextField T="string" Label="密码" Required="true" RequiredError="密码是必需的！"
+                              @bind-Value="UserDto.Password" InputType="InputType.Password"
+                              Validation="@(new Func<string, IEnumerable<string>>(PasswordStrength))"/>
+            }
+            else
+            {
+                <MudTextField T="string" Label="密码" Required="false" HelperText="如果不需要重设密码，请不要填写此内容！"
+                              @bind-Value="UserDto.Password" InputType="InputType.Password"
+                              Validation="@(new Func<string, IEnumerable<string>>(PasswordStrength))"/>
+            }
+            <div class="d-flex">
+                <MudRadioGroup @bind-Value="UserDto.Roles[0]" T="string">
+                    <MudRadio Value="@("admin")" Color="Color.Primary">管理员</MudRadio>
+                    <MudRadio Value="@("salesman")" Color="Color.Primary">销售员</MudRadio>
+                </MudRadioGroup>
+            </div>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="Cancel">取消</MudButton>
+            <MudButton Disabled="@(!isSuccess)" Color="Color.Success"
+                       OnClick="() => IsCreate ? AddUser() : UpdateUser()">
+                @(IsCreate ? "添加" : "更新")
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+</MudForm>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public UserManager<ApplicationUser> UserManager { get; set; } = default!;
+
+    [Parameter] public bool IsCreate { get; set; }
+
+    [Parameter] public required string UserName { get; set; }
+
+    // 表单内的数据是否全部通过验证
+    bool isSuccess = false;
+
+    // 代表表单中的数据
+    private UserDto UserDto { get; set; } = default!;
+
+    // DTO数据对应的实际数据
+    private ApplicationUser User = default!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await base.OnParametersSetAsync();
+        if (!IsCreate)
+        {
+            // 加载要修改的用户
+            User = await UserManager.FindByNameAsync(UserName) ?? throw new InvalidOperationException();
+            UserDto = new UserDto
+            {
+                UserName = User.UserName,
+                Nickname = User.Nickname,
+                PhoneNumber = User.PhoneNumber,
+                Roles = UserManager.GetRolesAsync(User).Result.ToList(),
+            };
+        }
+        else
+        {
+            UserDto = new UserDto
+            {
+                UserName = string.Empty,
+                Nickname = string.Empty,
+                PhoneNumber = string.Empty,
+                Roles = ["salesman",]
+            };
+        }
+    }
+
+    /// <summary>
+    /// 用户点击取消时的操作。
+    /// </summary>
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    /// <summary>
+    /// 添加员工到数据库，显示结果信息，并关闭本对话框。
+    /// </summary>
+    private async Task AddUser()
+    {
+        User = new ApplicationUser()
+        {
+            UserName = UserDto.UserName,
+            Nickname = UserDto.Nickname,
+            PhoneNumber = UserDto.PhoneNumber,
+            PhoneNumberConfirmed = true
+        };
+        var result = await UserManager.CreateAsync(User, UserDto.Password!);
+        if (result.Succeeded)
+        {
+            Snackbar.Add("员工添加成功！", Severity.Success);
+            // 角色
+            var roleResult = await UserManager.AddToRolesAsync(User, UserDto.Roles);
+            if (roleResult.Succeeded)
+            {
+                Snackbar.Add("员工角色设置成功！", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                foreach (var error in result.Errors)
+                {
+                    Logger.LogError("员工角色设置失败！错误{ErrorCode}:{ErrorDescription}", error.Code, error.Description);
+                }
+
+                Snackbar.Add("员工角色设置失败！", Severity.Error);
+                MudDialog.Close(DialogResult.Ok(false));
+            }
+        }
+        else
+        {
+            foreach (var error in result.Errors)
+            {
+                Logger.LogError("添加员工失败！错误{ErrorCode}:{ErrorDescription}", error.Code, error.Description);
+            }
+
+            Snackbar.Add("员工添加失败！", Severity.Error);
+            MudDialog.Close(DialogResult.Ok(false));
+        }
+    }
+
+    /// <summary>
+    /// 修改员工信息。
+    /// </summary>
+    private async Task UpdateUser()
+    {
+        bool isChanged = false;
+        if (User.UserName != UserDto.UserName)
+        {
+            User.UserName = UserDto.UserName;
+            isChanged = true;
+        }
+
+        if (User.Nickname != UserDto.Nickname)
+        {
+            User.Nickname = UserDto.Nickname;
+            isChanged = true;
+        }
+
+        if (User.PhoneNumber != UserDto.PhoneNumber)
+        {
+            User.PhoneNumber = UserDto.PhoneNumber;
+            User.PhoneNumberConfirmed = true;
+            isChanged = true;
+        }
+
+        // 在 UserManager 中，更新密码不与更新其他信息共用更新方法
+        // 更新员工基本信息（不包括密码和角色）
+        if (isChanged)
+        {
+            var result = await UserManager.UpdateAsync(User);
+            if (result.Succeeded)
+            {
+                Snackbar.Add("员工基本信息更新成功！", Severity.Success);
+            }
+            else
+            {
+                foreach (var error in result.Errors)
+                {
+                    Logger.LogError("更新员工信息失败！错误{ErrorCode}:{ErrorDescription}", error.Code, error.Description);
+                }
+
+                Snackbar.Add("员工信息更新失败！", Severity.Error);
+            }
+        }
+
+        // 仅更新密码
+        if (!UserDto.Password.IsNullOrEmpty())
+        {
+            var passwordResetToken = await UserManager.GeneratePasswordResetTokenAsync(User);
+            var result = await UserManager.ResetPasswordAsync(User, passwordResetToken, UserDto.Password!);
+            if (result.Succeeded)
+            {
+                Snackbar.Add("员工密码更新成功！", Severity.Success);
+            }
+            else
+            {
+                foreach (var error in result.Errors)
+                {
+                    Logger.LogError("更新员工密码失败！错误{ErrorCode}:{ErrorDescription}", error.Code, error.Description);
+                }
+
+                Snackbar.Add("员工密码更新失败！", Severity.Error);
+            }
+        }
+
+        // 角色
+        var currentRoles = await UserManager.GetRolesAsync(User);
+        var needRemoveRoles = currentRoles.Except(UserDto.Roles).ToList();
+        var needAddRoles = UserDto.Roles.Except(currentRoles).ToList();
+        if (!needRemoveRoles.IsNullOrEmpty())
+        {
+            var result = await UserManager.RemoveFromRolesAsync(User, needRemoveRoles);
+            if (result.Succeeded)
+            {
+                Snackbar.Add("员工角色移除成功！", Severity.Success);
+            }
+            else
+            {
+                foreach (var error in result.Errors)
+                {
+                    Logger.LogError("员工角色移除失败！错误{ErrorCode}:{ErrorDescription}", error.Code, error.Description);
+                }
+
+                Snackbar.Add("员工角色移除失败！", Severity.Error);
+            }
+        }
+
+        if (!needAddRoles.IsNullOrEmpty())
+        {
+            var result = await UserManager.AddToRolesAsync(User, needRemoveRoles);
+            if (result.Succeeded)
+            {
+                Snackbar.Add("员工角色增加成功！", Severity.Success);
+            }
+            else
+            {
+                foreach (var error in result.Errors)
+                {
+                    Logger.LogError("员工角色增加失败！错误{ErrorCode}:{ErrorDescription}", error.Code, error.Description);
+                }
+
+                Snackbar.Add("员工角色增加失败！", Severity.Error);
+            }
+        }
+
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    /// <summary>
+    /// 验证密码强度的方法。
+    /// </summary>
+    /// <param name="pw">待检测的密码。</param>
+    /// <returns>如果密码强度不符合要求，则返回修改意见。</returns>
+    private IEnumerable<string> PasswordStrength(string pw)
+    {
+        if (pw.Length < 8)
+            yield return "密码长度必须大于 8 ";
+        if (!Regex.IsMatch(pw, @"[A-Z]"))
+            yield return "密码需要至少一个大写字母";
+        if (!Regex.IsMatch(pw, @"[a-z]"))
+            yield return "密码需要至少一个小写字母";
+        if (!Regex.IsMatch(pw, @"[0-9]"))
+            yield return "密码需要至少一个数字";
+        if (!Regex.IsMatch(pw, @"[\W_]")) // 检查是否包含符号（非字母数字字符）
+            yield return "密码需要至少一个符号";
+
+    }
+    
+    /// <summary>
+    /// 检验用户名是否符合要求的方法。
+    /// </summary>
+    /// <param name="username">待检测的用户名。</param>
+    /// <returns>如果用户名不符合要求，则返回修改意见。</returns>
+    private IEnumerable<string> UsernameValidation(string username)
+    {
+        // 检查用户名长度
+        if (username.Length < 3 || username.Length > 20)
+            yield return "用户名长度必须在 3 到 20 个字符之间";
+
+        // 检查用户名是否只包含字母和数字
+        if (!Regex.IsMatch(username, @"^[a-zA-Z0-9]+$"))
+            yield return "用户名只能包含字母和数字";
+
+        // 可以添加更多规则，例如禁止使用某些关键词
+        var forbiddenKeywords = new[] { "admin", "root", "administrator" };
+        if (forbiddenKeywords.Any(keyword => username.Contains(keyword, StringComparison.OrdinalIgnoreCase)))
+            yield return "用户名不能包含受限制的关键词";
+    }
+    
+    /// <summary>
+    /// 检验昵称是否符合要求的方法。
+    /// </summary>
+    /// <param name="nickname">待检测的昵称。</param>
+    /// <returns>如果昵称不符合要求，则返回修改意见。</returns>
+    private IEnumerable<string> NicknameValidation(string nickname)
+    {
+        // 检查昵称长度
+        if (nickname.Length is < 2 or > 20)
+            yield return "昵称长度必须在 3 到 20 个字符之间";
+
+        // 可以添加更多规则，例如禁止使用某些关键词
+        var forbiddenKeywords = new[] { "admin", "root", "administrator" };
+        if (forbiddenKeywords.Any(keyword => nickname.Contains(keyword, StringComparison.OrdinalIgnoreCase)))
+            yield return "昵称不能包含受限制的关键词";
+    }
+    
+    /// <summary>
+    /// 验证手机号码是否符合要求的方法。
+    /// </summary>
+    /// <param name="phoneNumber">待检测的电话号码</param>
+    /// <returns>检测结果。</returns>
+    private IEnumerable<string> ValidatePhoneNumber(string phoneNumber)
+    {
+        // 检查移动电话号码（以1开头，长度为11位）
+        if (Regex.IsMatch(phoneNumber, @"^1[3-9]\d{9}$"))
+            yield break;  // 如果是有效的移动电话号码，则直接返回
+        yield return "手机号码格式不正确";
+    }
+}

@@ -1,0 +1,174 @@
+﻿@page "/purchase-orders"
+@attribute [Authorize(Roles = "admin")]
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using CatStore.Models
+@using CatStore.Data
+@implements IAsyncDisposable
+@inject IDbContextFactory<CatStoreContext> DbFactory
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>进货订单管理</PageTitle>
+
+<MudDataGrid @ref="dataGrid" T="PurchaseOrder" ServerData="GetPurchaseOrdersAsync"
+             ReadOnly="true" EditMode="DataGridEditMode.Form"
+             EditTrigger="DataGridEditTrigger.Manual"
+             Striped="true" Elevation="5" Class="ma-4 pa-4">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">进货订单管理</MudText>
+        <MudSpacer/>
+        <MudButton @onclick="AddPurchaseOrderAsync" Variant="Variant.Filled" Color="Color.Success">
+            添加进货订单
+        </MudButton>
+    </ToolBarContent>
+    <Columns>
+        <HierarchyColumn T="PurchaseOrder"/>
+        <PropertyColumn Property="x => x.SupplierPhone" Title="供货商电话"/>
+        <PropertyColumn Property="x => x.TransactionTime" Title="交易时间"/>
+        <PropertyColumn Property="x => x.TotalAmount" Title="金额"/>
+        <TemplateColumn>
+            <CellTemplate>
+                <MudStack Row>
+                    <MudIconButton Size="@Size.Small" Icon="@Icons.Material.Outlined.Edit"
+                                   OnClick="@(() => UpdatePurchaseOrderAsync(context.Item!.OrderId))"/>
+                    <MudIconButton Size="@Size.Small" Icon="@Icons.Material.Outlined.DeleteForever"
+                                   OnClick="@(() => OnDeleteButtonClickedAsync(context.Item))"/>
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <ChildRowContent Context="x">
+        <MudDataGrid T="PurchaseOrderItem" Items="@x.Item.PurchaseOrderItems" Striped="true" Elevation="5" Class="ma-4 pa-4"
+                     ReadOnly="true">
+            <Columns>
+                <PropertyColumn Property="item => item.Commodity.Name" Title="商品名"/>
+                <PropertyColumn Property="item => item.Quantity" Title="数量"/>
+            </Columns>
+        </MudDataGrid>
+    </ChildRowContent>
+    <PagerContent>
+        <MudDataGridPager T="PurchaseOrder" PageSizeOptions="@(new[] { 5, 10, 20 })"/>
+    </PagerContent>
+</MudDataGrid>
+
+@code {
+    private MudDataGrid<PurchaseOrder> dataGrid = default!;
+
+    private CatStoreContext dbContext = default!;
+
+    protected override void OnInitialized()
+    {
+        dbContext = DbFactory.CreateDbContext();
+    }
+
+    public async ValueTask DisposeAsync() => await dbContext.DisposeAsync();
+
+    /// <summary>
+    /// 页面中数据网格的数据源，用于获取订单数据。
+    /// </summary>
+    /// <param name="state">用于获取分页、排序信息。</param>
+    /// <returns>向数据网格提供数据。</returns>
+    private async Task<GridData<PurchaseOrder>> GetPurchaseOrdersAsync(GridState<PurchaseOrder> state)
+    {
+        IQueryable<PurchaseOrder> query = dbContext.PurchaseOrder;
+
+        var sortDefinition = state.SortDefinitions.FirstOrDefault();
+        if (sortDefinition != null)
+        {
+            query = sortDefinition.SortBy switch
+            {
+                nameof(CommodityOrder.TotalAmount) => sortDefinition.Descending ? query.OrderByDescending(co => co.TotalAmount) : query.OrderBy(co => co.TotalAmount),
+                nameof(CommodityOrder.TransactionTime) => sortDefinition.Descending ? query.OrderByDescending(co => co.TransactionTime) : query.OrderBy(co => co.TransactionTime),
+                _ => query.OrderByDescending(co => co.OrderId)
+            };
+        }
+
+        int totalItems = await query.CountAsync();
+        var pagedData = await query.Skip(state.Page * state.PageSize).Take(state.PageSize)
+            .Include(o => o.PurchaseOrderItems)
+            .ThenInclude(o => o.Commodity)
+            .ToArrayAsync();
+
+        return new GridData<PurchaseOrder>
+        {
+            TotalItems = totalItems,
+            Items = pagedData
+        };
+    }
+
+    /// <summary>
+    /// 当用户点击删除按钮时触发，用于弹出删除确认对话框。
+    /// </summary>
+    /// <param name="item">要删除的一条数据。</param>
+    private async Task OnDeleteButtonClickedAsync(PurchaseOrder? item)
+    {
+        bool? result = await DialogService.ShowMessageBox(
+            "警告",
+            "删除后无法恢复！",
+            yesText: "删除！", cancelText: "取消");
+        if (result is true)
+        {
+            if (item != null)
+            {
+                dbContext.PurchaseOrder.Remove(item);
+                try
+                {
+                    await dbContext.SaveChangesAsync();
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    Snackbar.Add("原信息不存在！", Severity.Error);
+                }
+                finally
+                {
+                    await dataGrid.ReloadServerData();
+                }
+            }
+            else
+            {
+                Snackbar.Add("原信息不存在！", Severity.Error);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 显示添加订单对话框。
+    /// </summary>
+    private async Task AddPurchaseOrderAsync()
+    {
+        var parameters = new DialogParameters<CreateOrEditAPurchaseOrder>
+        {
+            { x => x.dbContext, dbContext },
+            { x => x.IsCreate, true }
+        };
+        var dialog = await DialogService.ShowAsync<CreateOrEditAPurchaseOrder>("添加进货订单", parameters);
+        var result = await dialog.Result;
+
+        if (!result!.Canceled)
+        {
+            await dataGrid.ReloadServerData();
+        }
+    }
+
+    /// <summary>
+    /// 显示修改订单对话框。
+    /// </summary>
+    private async Task UpdatePurchaseOrderAsync(int orderId)
+    {
+        var parameters = new DialogParameters<CreateOrEditAPurchaseOrder>
+        {
+            { x => x.dbContext, dbContext },
+            { x => x.IsCreate, false },
+            { x => x.OrderId, orderId },
+        };
+        var dialog = await DialogService.ShowAsync<CreateOrEditAPurchaseOrder>("修改进货订单", parameters);
+        var result = await dialog.Result;
+
+        if (!result!.Canceled)
+        {
+            await dataGrid.ReloadServerData();
+        }
+    }
+
+}

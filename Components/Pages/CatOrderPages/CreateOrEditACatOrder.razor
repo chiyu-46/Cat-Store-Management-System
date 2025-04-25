@@ -1,0 +1,120 @@
+﻿@using Microsoft.EntityFrameworkCore
+@using CatStore.Models
+@using CatStore.Data
+@inject ISnackbar Snackbar
+
+<EditForm Model="@TheCatOrder" OnValidSubmit="() => IsCreate? AddCatOrder():UpdateCatOrder()"
+          FormName="create-cat-order" Enhance>
+    <DataAnnotationsValidator/>
+    <MudDialog>
+        <TitleContent>
+            <MudText>
+                <MudIcon Icon="@Icons.Material.Outlined.Add" Class="mr-3 mb-n1"/>
+                @(IsCreate ? "添加新猫咪订单" : "修改猫咪订单")
+            </MudText>
+        </TitleContent>
+        <DialogContent>
+            <MudTextField Label="顾客电话" @bind-Value="TheCatOrder.CustomerPhone"
+                          For="@(() => TheCatOrder.CustomerPhone)"/>
+            @if (IsCreate)
+            {
+                <MudAutocomplete Label="猫咪名字" T="CatInfo" @bind-Value="TheCatOrder.CatInfo" Required="true"
+                                 SearchFunc="SearchCatInfo" ToStringFunc="@(catInfo => catInfo?.Name)"
+                                 CoerceText="true" ResetValueOnEmptyText="false"
+                                 ShowProgressIndicator="true" ProgressIndicatorColor="Color.Default"
+                                 Strict="false"/>
+            }
+            else
+            {
+                <MudTextField Label="猫咪名字" @bind-Value="TheCatOrder.CatInfo.Name" ReadOnly="true"
+                              HelperText="禁止修改订单关联的猫咪！"/>
+            }
+
+            <MudNumericField Label="金额" @bind-Value="TheCatOrder.Amount" For="() => TheCatOrder.Amount"
+                             Variant="Variant.Text" Min="0M"/>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="Cancel">取消</MudButton>
+            <MudButton ButtonType="ButtonType.Submit" Color="Color.Success">@(IsCreate ? "添加" : "更新")</MudButton>
+        </DialogActions>
+    </MudDialog>
+</EditForm>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public CatStoreContext dbContext { get; set; } = default!;
+
+    [Parameter] public bool IsCreate { get; set; }
+
+    [Parameter] public int OrderId { get; set; }
+
+    // 代表表单中的数据
+    private CatOrder TheCatOrder { get; set; } = new();
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        if (!IsCreate)
+        {
+            TheCatOrder = (from catOrder in dbContext.CatOrder
+                    where catOrder.OrderId == OrderId
+                    select catOrder)
+                .Include(o => o.CatInfo)
+                .First();
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    /// <summary>
+    /// 添加猫咪订单到数据库，显示结果信息，并关闭本对话框。
+    /// </summary>
+    private async Task AddCatOrder()
+    {
+        // 猫咪订单达成的同时，猫咪的状态更改为已售出
+        TheCatOrder.CatInfo.CatState = CatState.Sold;
+        // 初始化订单交易时间
+        TheCatOrder.TransactionTime = DateTime.Now;
+        // 提交订单到数据库（由于关联属性，无需显式处理关联表）
+        dbContext.CatOrder.Add(TheCatOrder);
+        await dbContext.SaveChangesAsync();
+        Snackbar.Add("新猫咪订单添加成功！", Severity.Success);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    /// <summary>
+    /// 修改猫咪订单。
+    /// </summary>
+    private async Task UpdateCatOrder()
+    {
+        await dbContext.SaveChangesAsync();
+        Snackbar.Add("新猫咪订单修改成功！", Severity.Success);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    /// <summary>
+    /// 搜索名字中包含 value 的猫咪信息。
+    /// </summary>
+    /// <param name="value">猫咪名字包含的字符。</param>
+    /// <param name="token">取消令牌。</param>
+    /// <returns>所有符合条件的猫咪信息。</returns>
+    private async Task<IEnumerable<CatInfo>> SearchCatInfo(string value, CancellationToken token)
+    {
+        // 只有待售的猫咪才可以出售
+        if (string.IsNullOrEmpty(value))
+        {
+            // 如果未传入 value ，则仅返回待售猫咪列表
+            return await dbContext.CatInfo
+                .Where(c => c.CatState == CatState.ForSale)
+                .Take(10)
+                .ToListAsync(token);
+        }
+
+        return await dbContext.CatInfo
+            .Where(c => c.Name!.Contains(value) && c.CatState == CatState.ForSale)
+            .Take(10)
+            .ToListAsync(token);
+    }
+
+}

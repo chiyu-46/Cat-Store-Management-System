@@ -1,0 +1,72 @@
+﻿@using CatStore.Data
+@using Microsoft.AspNetCore.Identity
+@inherits LayoutComponentBase
+@inject UserManager<ApplicationUser> UserManager
+
+@* Required *@
+<MudThemeProvider/>
+<MudPopoverProvider/>
+
+@* Needed for dialogs *@
+<MudDialogProvider/>
+
+@* Needed for snackbars *@
+<MudSnackbarProvider/>
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                       OnClick="@((e) => DrawerToggle())"/>
+        <MudText Typo="Typo.h5" Class="ml-3">宠物店管理系统</MudText>
+        <MudSpacer/>
+        <AuthorizeView>
+            <Authorized>
+                <MudText Typo="Typo.h6" Class="mr-3">
+                    @nickname
+                </MudText>
+                <form action="Account/Logout" method="post">
+                    <AntiforgeryToken/>
+                    <MudIconButton Icon="@Icons.Material.Filled.Logout"
+                                   ButtonType="ButtonType.Submit"
+                                   Color="Color.Inherit" Edge="Edge.End">
+                    </MudIconButton>
+                </form>
+            </Authorized>
+        </AuthorizeView>
+    </MudAppBar>
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+        <NavMenu/>
+    </MudDrawer>
+    <MudMainContent>
+        @Body
+    </MudMainContent>
+</MudLayout>
+
+<div id="blazor-error-ui" data-nosnippet>
+    发生了一个未处理的错误。
+    <a href="." class="reload">重新加载</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    bool _drawerOpen = true;
+    private string nickname = default!;
+    [CascadingParameter]
+    private Task<AuthenticationState>? authenticationState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        if (authenticationState is not null)
+        {
+            var authState = await authenticationState;
+            var userName = authState?.User.Identity?.Name;
+            nickname = (await UserManager.FindByNameAsync(userName)).Nickname;
+        }
+    }
+
+    void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+}

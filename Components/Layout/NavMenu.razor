@@ -1,0 +1,18 @@
+﻿<MudNavMenu Bordered="true">
+    <AuthorizeView Roles="admin, salesman">
+        <Authorized>
+            <MudNavLink Href="/" Match="NavLinkMatch.All">仪表盘</MudNavLink>
+            <MudNavLink Href="/cat-infos" Match="NavLinkMatch.Prefix">猫咪信息管理</MudNavLink>
+            <MudNavLink Href="/commodities" Match="NavLinkMatch.Prefix">商品库存管理</MudNavLink>
+            <MudNavLink Href="/cat-orders" Match="NavLinkMatch.Prefix">猫咪订单管理</MudNavLink>
+            <MudNavLink Href="/commodity-orders" Match="NavLinkMatch.Prefix">商品订单管理</MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+    <AuthorizeView Roles="admin">
+        <Authorized>
+            <MudNavLink Href="/purchase-orders" Match="NavLinkMatch.Prefix">商品进货管理</MudNavLink>
+            @* <MudNavLink Href="/servers" Match="NavLinkMatch.Prefix">店内消耗管理</MudNavLink> *@
+            <MudNavLink Href="/employees" Match="NavLinkMatch.Prefix">店内员工管理</MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+</MudNavMenu>

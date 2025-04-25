@@ -1,0 +1,178 @@
+﻿@page "/cat-orders"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using CatStore.Models
+@using CatStore.Data
+@implements IAsyncDisposable
+@inject IDbContextFactory<CatStoreContext> DbFactory
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>猫咪订单管理</PageTitle>
+
+<MudDataGrid @ref="dataGrid" T="CatOrder" ServerData="GetCatOrdersAsync"
+             ReadOnly="true" EditMode="DataGridEditMode.Form"
+             EditTrigger="DataGridEditTrigger.Manual"
+             Striped="true" Elevation="5" Class="ma-4 pa-4">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">猫咪订单管理</MudText>
+        <MudSpacer/>
+        <MudButton @onclick="AddCatOrderAsync" Variant="Variant.Filled" Color="Color.Success">添加新猫咪订单</MudButton>
+    </ToolBarContent>
+    <Columns>
+        <HierarchyColumn T="CatOrder"/>
+        <PropertyColumn Property="catOrder => catOrder.CustomerPhone" Title="顾客电话"/>
+        <PropertyColumn Property="catOrder => catOrder.TransactionTime" Title="交易时间"/>
+        <PropertyColumn Property="catOrder => catOrder.CatInfo.Name" Title="猫咪名字"/>
+        <PropertyColumn Property="catOrder => catOrder.Amount" Title="金额"/>
+        <TemplateColumn>
+            <CellTemplate>
+                <MudStack Row>
+                    <MudIconButton Size="@Size.Small" Icon="@Icons.Material.Outlined.Edit"
+                                   OnClick="@(() => UpdateCatOrderAsync(context.Item!.OrderId))"/>
+                    <MudIconButton Size="@Size.Small" Icon="@Icons.Material.Outlined.DeleteForever"
+                                   OnClick="@(() => OnDeleteButtonClickedAsync(context.Item))"/>
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <ChildRowContent>
+        <MudCard>
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">@context.Item.CatInfo.Name</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText>品种： @context.Item.CatInfo.GetNaturalCatBreed()</MudText>
+                <MudText>性别： @context.Item.CatInfo.GetNaturalGender()</MudText>
+                <MudText>生日： @context.Item.CatInfo.Birthday</MudText>
+            </MudCardContent>
+        </MudCard>
+    </ChildRowContent>
+    <PagerContent>
+        <MudDataGridPager T="CatOrder" PageSizeOptions="@(new[] { 5, 10, 20 })"/>
+    </PagerContent>
+</MudDataGrid>
+
+@code {
+    private MudDataGrid<CatOrder> dataGrid = default!;
+
+    private CatStoreContext dbContext = default!;
+
+    protected override void OnInitialized()
+    {
+        dbContext = DbFactory.CreateDbContext();
+    }
+
+    public async ValueTask DisposeAsync() => await dbContext.DisposeAsync();
+
+    /// <summary>
+    /// 页面中数据网格的数据源，用于获取猫咪订单数据。
+    /// </summary>
+    /// <param name="state">用于获取分页、排序信息。</param>
+    /// <returns>向数据网格提供数据。</returns>
+    private async Task<GridData<CatOrder>> GetCatOrdersAsync(GridState<CatOrder> state)
+    {
+        IQueryable<CatOrder> query = dbContext.CatOrder;
+
+        var sortDefinition = state.SortDefinitions.FirstOrDefault();
+        if (sortDefinition != null)
+        {
+            query = sortDefinition.SortBy switch
+            {
+                nameof(CatOrder.Amount) => sortDefinition.Descending ? query.OrderByDescending(co => co.Amount) : query.OrderBy(co => co.Amount),
+                nameof(CatOrder.TransactionTime) => sortDefinition.Descending ? query.OrderByDescending(co => co.TransactionTime) : query.OrderBy(co => co.TransactionTime),
+                _ => query.OrderByDescending(co => co.OrderId)
+            };
+        }
+
+        int totalItems = await query.CountAsync();
+        var pagedData = await query.Skip(state.Page * state.PageSize).Take(state.PageSize)
+            .Include(o => o.CatInfo).ToArrayAsync();
+
+        return new GridData<CatOrder>
+        {
+            TotalItems = totalItems,
+            Items = pagedData
+        };
+    }
+
+    /// <summary>
+    /// 当用户点击删除按钮时触发，用于弹出删除确认对话框。
+    /// </summary>
+    /// <param name="item">要删除的一条数据。</param>
+    private async Task OnDeleteButtonClickedAsync(CatOrder? item)
+    {
+        bool? result = await DialogService.ShowMessageBox(
+            "警告",
+            "删除后无法恢复！",
+            yesText: "删除！", cancelText: "取消");
+        if (result is true)
+        {
+            if (item != null)
+            {
+                dbContext.CatOrder.Remove(item);
+                // 猫咪订单消失，猫咪重新回到待售状态。
+                item.CatInfo.CatState = CatState.ForSale;
+                try
+                {
+                    await dbContext.SaveChangesAsync();
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    Snackbar.Add("原信息不存在！", Severity.Error);
+                }
+                finally
+                {
+                    await dataGrid.ReloadServerData();
+                }
+            }
+            else
+            {
+                Snackbar.Add("原信息不存在！", Severity.Error);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 显示添加猫咪订单对话框。
+    /// </summary>
+    private async Task AddCatOrderAsync()
+    {
+        var parameters = new DialogParameters<CreateOrEditACatOrder>
+        {
+            { x => x.dbContext, dbContext },
+            { x => x.IsCreate, true }
+        };
+        var dialog = await DialogService.ShowAsync<CreateOrEditACatOrder>("添加新猫咪订单", parameters);
+        var result = await dialog.Result;
+
+        if (!result!.Canceled)
+        {
+            await dataGrid.ReloadServerData();
+        }
+    }
+
+    /// <summary>
+    /// 显示修改猫咪订单对话框。
+    /// </summary>
+    private async Task UpdateCatOrderAsync(int orderId)
+    {
+        var parameters = new DialogParameters<CreateOrEditACatOrder>
+        {
+            { x => x.dbContext, dbContext },
+            { x => x.IsCreate, false },
+            { x => x.OrderId, orderId },
+        };
+        var dialog = await DialogService.ShowAsync<CreateOrEditACatOrder>("修改新猫咪订单", parameters);
+        var result = await dialog.Result;
+
+        if (!result!.Canceled)
+        {
+            await dataGrid.ReloadServerData();
+        }
+    }
+
+}

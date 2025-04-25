@@ -1,0 +1,94 @@
+﻿@page "/"
+@attribute [Authorize]
+@using Microsoft.EntityFrameworkCore
+@using CatStore.Models
+@using CatStore.Data
+@using Microsoft.AspNetCore.Authorization
+@implements IAsyncDisposable
+@inject IDbContextFactory<CatStoreContext> DbFactory
+
+<PageTitle>宠物店管理系统</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="my-4">
+    <MudAlert Severity="Severity.Success">
+        登录成功！
+        <br/>
+        欢迎使用宠物店管理系统！
+    </MudAlert>
+    <div class="d-flex flex-grow-1 gap-4 my-4">
+        <MudPaper Class="flex-auto d-flex pa-4" Width="50%" Elevation="4">
+            <div class="flex-grow-1">
+                <MudText Typo="Typo.h6" Color="Color.Primary" Class="mb-4">
+                    猫咪数量
+                </MudText>
+                <MudText Typo="Typo.h4">
+                    @catNum
+                </MudText>
+            </div>
+            <div class="d-flex align-end justify-end mud-height-full py-8">
+                <MudIcon Icon="@Icons.Material.Filled.Pets" Size="Size.Large" Color="Color.Primary"/>
+            </div>
+        </MudPaper>
+        <MudPaper Class="flex-auto d-flex pa-4" Width="50%" Elevation="4">
+            <div class="flex-grow-1">
+                <MudText Typo="Typo.h6" Color="Color.Primary" Class="mb-4">
+                    商品种数
+                </MudText>
+                <MudText Typo="Typo.h4">
+                    @commodityNum
+                </MudText>
+            </div>
+            <div class="d-flex align-end justify-end mud-height-full py-8">
+                <MudIcon Icon="@Icons.Material.Filled.Widgets" Size="Size.Large" Color="Color.Primary"/>
+            </div>
+        </MudPaper>
+        <MudPaper Class="flex-auto d-flex pa-4" Width="50%" Elevation="4">
+            <div class="flex-grow-1">
+                <MudText Typo="Typo.h6" Color="Color.Primary" Class="mb-4">
+                    月营业额
+                </MudText>
+                <MudText Typo="Typo.h4">
+                    @turnover
+                </MudText>
+            </div>
+            <div class="d-flex align-end justify-end mud-height-full py-8">
+                <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Size="Size.Large" Color="Color.Primary"/>
+            </div>
+        </MudPaper>
+    </div>
+</MudContainer>
+
+@code
+{
+    private int catNum;
+    private int commodityNum;
+    private decimal turnover;
+
+    private CatStoreContext dbContext = default!;
+
+    protected override void OnInitialized()
+    {
+        dbContext = DbFactory.CreateDbContext();
+    }
+
+    public async ValueTask DisposeAsync() => await dbContext.DisposeAsync();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await base.OnParametersSetAsync();
+        catNum = await dbContext.CatInfo.CountAsync();
+        commodityNum = await dbContext.Commodity.CountAsync();
+
+        // 获取当前月份的第一天和最后一天
+        var firstDayOfMonth = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+        var lastDayOfMonth = firstDayOfMonth.AddMonths(1).AddDays(-1);
+
+        // 计算本月所有订单的总金额
+        turnover = await dbContext.CommodityOrder
+                       .Where(co => co.TransactionTime >= firstDayOfMonth && co.TransactionTime <= lastDayOfMonth)
+                       .SumAsync(co => co.TotalAmount)
+                   + await dbContext.CatOrder
+                       .Where(co => co.TransactionTime >= firstDayOfMonth && co.TransactionTime <= lastDayOfMonth)
+                       .SumAsync(co => co.Amount);
+    }
+}

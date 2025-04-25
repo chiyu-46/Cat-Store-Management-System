@@ -1,0 +1,186 @@
+﻿@page "/employees"
+@attribute [Authorize(Roles = "admin")]
+@using Microsoft.AspNetCore.Authorization
+@using CatStore.Components.Pages.PurchaseOrderPages
+@using CatStore.Data
+@using CatStore.Models
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+
+@inject UserManager<ApplicationUser> UserManager
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject ILogger<Index> Logger
+
+<PageTitle>店内员工管理</PageTitle>
+
+<MudDataGrid @ref="dataGrid" T="UserDto" ServerData="GetUsersAsync"
+             ReadOnly="true" EditMode="DataGridEditMode.Form"
+             EditTrigger="DataGridEditTrigger.Manual"
+             Striped="true" Elevation="5" Class="ma-4 pa-4">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">店内员工管理</MudText>
+        <MudSpacer/>
+        <MudButton @onclick="AddUserAsync" Variant="Variant.Filled" Color="Color.Success">
+            添加员工
+        </MudButton>
+    </ToolBarContent>
+    <Columns>
+        <PropertyColumn Property="x => x.UserName" Title="用户名"/>
+        <PropertyColumn Property="x => x.Nickname" Title="昵称"/>
+        <PropertyColumn Property="x => x.PhoneNumber" Title="电话号码"/>
+        @* <PropertyColumn Property="x => x.RoleNameDictionary[x.Roles.First()]" Title="角色"/> *@
+        <TemplateColumn Title="角色">
+            <CellTemplate>
+                <MudChipSet ReadOnly="true">
+                    @foreach (var role in context.Item!.Roles)
+                    {
+                        <MudChip Color="Color.Info">@UserDto.RoleNameDictionary[role]</MudChip>
+                    }
+                </MudChipSet>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn>
+            <CellTemplate>
+                <MudStack Row>
+                    @* 禁止修改或删除原始填充用户 *@
+                    <MudIconButton Size="@Size.Small" Icon="@Icons.Material.Outlined.Edit"
+                                   Disabled="@(context.Item!.UserName == "xiaoshi" || context.Item!.UserName == "xiaohe")"
+                                   OnClick="@(() => UpdateUserAsync(context.Item!.UserName!))"/>
+                    <MudIconButton Size="@Size.Small" Icon="@Icons.Material.Outlined.DeleteForever"
+                                   Disabled="@(context.Item!.UserName == "xiaoshi" || context.Item!.UserName == "xiaohe")"
+                                   OnClick="@(() => OnDeleteButtonClickedAsync(context.Item))"/>
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <PagerContent>
+        <MudDataGridPager T="UserDto" PageSizeOptions="@(new[] { 5, 10, 20 })"/>
+    </PagerContent>
+</MudDataGrid>
+
+@code {
+    private MudDataGrid<UserDto> dataGrid = default!;
+
+    /// <summary>
+    /// 页面中数据网格的数据源，用于获取用户数据。
+    /// </summary>
+    /// <param name="state">用于获取分页、排序信息。</param>
+    /// <returns>向数据网格提供数据。</returns>
+    private async Task<GridData<UserDto>> GetUsersAsync(GridState<UserDto> state)
+    {
+        var query = UserManager.Users.Select(user => new UserDto
+        {
+            UserName = user.UserName,
+            Nickname = user.Nickname,
+            PhoneNumber = user.PhoneNumber,
+            Roles = UserManager.GetRolesAsync(user).Result.ToList()
+        }).AsQueryable();
+
+        // Apply sorting if any
+        var sortDefinition = state.SortDefinitions.FirstOrDefault();
+        if (sortDefinition != null)
+        {
+            query = sortDefinition.SortBy switch
+            {
+                nameof(UserDto.UserName) => sortDefinition.Descending ? query.OrderByDescending(dto => dto.UserName) : query.OrderBy(dto => dto.UserName),
+                nameof(UserDto.Nickname) => sortDefinition.Descending ? query.OrderByDescending(dto => dto.Nickname) : query.OrderBy(dto => dto.Nickname),
+                nameof(UserDto.PhoneNumber) => sortDefinition.Descending ? query.OrderByDescending(dto => dto.PhoneNumber) : query.OrderBy(dto => dto.PhoneNumber),
+                _ => query.OrderByDescending(dto => dto.UserName)
+            };
+        }
+
+        int totalItems = await query.CountAsync();
+
+        // Execute the query with pagination
+        var pagedData = await query.Skip(state.Page * state.PageSize).Take(state.PageSize).ToListAsync();
+
+        return new GridData<UserDto>
+        {
+            TotalItems = totalItems,
+            Items = pagedData
+        };
+    }
+
+    /// <summary>
+    /// 当用户点击删除按钮时触发，用于弹出删除确认对话框。
+    /// </summary>
+    /// <param name="item">要删除的一条数据。</param>
+    private async Task OnDeleteButtonClickedAsync(UserDto? item)
+    {
+        bool? result = await DialogService.ShowMessageBox(
+            "警告",
+            "删除后无法恢复！",
+            yesText: "删除！", cancelText: "取消");
+        if (result is true)
+        {
+            if (item != null)
+            {
+                var user = await UserManager.FindByNameAsync(item.UserName!);
+                if (user is null)
+                {
+                    Snackbar.Add("用户不存在！", Severity.Error);
+                    return;
+                }
+                var deleteResult = await UserManager.DeleteAsync(user);
+                if (deleteResult.Succeeded)
+                {
+                    Snackbar.Add("用户已删除！", Severity.Success);
+                    await dataGrid.ReloadServerData();
+                }
+                else
+                {
+                    Snackbar.Add("删除失败！", Severity.Error);
+                    foreach (var error in deleteResult.Errors)
+                    {
+                        Logger.LogError("删除用户失败！错误{ErrorCode}:{ErrorDescription}", error.Code, error.Description);
+                    }
+                }
+            }
+            else
+            {
+                Snackbar.Add("发生错误！", Severity.Error);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 显示添加对话框。
+    /// </summary>
+    private async Task AddUserAsync()
+    {
+        var parameters = new DialogParameters<CreateOrEditAEmployee>
+        {
+            { x => x.UserManager, UserManager },
+            { x => x.IsCreate, true }
+        };
+        var dialog = await DialogService.ShowAsync<CreateOrEditAEmployee>("添加员工", parameters);
+        var result = await dialog.Result;
+
+        if (!result!.Canceled)
+        {
+            await dataGrid.ReloadServerData();
+        }
+    }
+
+    /// <summary>
+    /// 显示修改对话框。
+    /// </summary>
+    private async Task UpdateUserAsync(string userName)
+    {
+        var parameters = new DialogParameters<CreateOrEditAEmployee>
+        {
+            { x => x.UserManager, UserManager },
+            { x => x.IsCreate, false },
+            { x => x.UserName, userName },
+        };
+        var dialog = await DialogService.ShowAsync<CreateOrEditAEmployee>("修改员工信息", parameters);
+        var result = await dialog.Result;
+
+        if (!result!.Canceled)
+        {
+            await dataGrid.ReloadServerData();
+        }
+    }
+
+}

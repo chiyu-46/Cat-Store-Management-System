@@ -1,0 +1,66 @@
+﻿@using Microsoft.EntityFrameworkCore
+@using CatStore.Models
+@using CatStore.Data
+@implements IAsyncDisposable
+@inject IDbContextFactory<CatStoreContext> DbFactory
+@inject ISnackbar Snackbar
+
+<EditForm Model="@commodity" OnValidSubmit="AddCommodity" FormName="create-commodity" Enhance>
+    <DataAnnotationsValidator/>
+    <MudDialog>
+        <TitleContent>
+            <MudText>
+                <MudIcon Icon="@Icons.Material.Outlined.Add" Class="mr-3 mb-n1"/>
+                添加新商品
+            </MudText>
+        </TitleContent>
+        <DialogContent>
+            <MudTextField Label="品牌" HelperText="最少一个字"
+                          @bind-Value="commodity.Brand" For="@(() => commodity.Brand)"/>
+            <MudSelect @bind-Value="commodity.CommodityType" Label="类型" Required RequiredError="必须选择类型！">
+                @foreach (CommodityType item in Enum.GetValues(typeof(CommodityType)))
+                {
+                    <MudSelectItem Value="@item">@Commodity.ConvertCommodityTypeToNaturalLanguage(item)</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField Label="商品名" HelperText="最少一个字" @bind-Value="commodity.Name" For="@(() => commodity.Name)"/>
+            <MudNumericField @bind-Value="commodity.QuantityInStock" Label="库存数量" Variant="Variant.Text" Min="0"/>
+            <MudTextField Label="单位" HelperText="最少一个字" @bind-Value="commodity.Unit" For="@(() => commodity.Unit)"/>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="Cancel">取消</MudButton>
+            <MudButton ButtonType="ButtonType.Submit" Color="Color.Success">添加</MudButton>
+        </DialogActions>
+    </MudDialog>
+</EditForm>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private CatStoreContext dbContext = default!;
+
+    // 代表表单中的数据
+    private Commodity commodity = new Commodity(){Unit = "个"};
+
+    protected override void OnInitialized()
+    {
+        dbContext = DbFactory.CreateDbContext();
+    }
+
+    public async ValueTask DisposeAsync() => await dbContext.DisposeAsync();
+
+
+    private void Cancel() => MudDialog.Cancel();
+
+    /// <summary>
+    /// 添加商品信息到数据库，显示结果信息，并关闭本对话框。
+    /// </summary>
+    private async Task AddCommodity()
+    {
+        dbContext.Commodity.Add(commodity);
+        await dbContext.SaveChangesAsync();
+        Snackbar.Add("新商品添加成功！", Severity.Success);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+}
