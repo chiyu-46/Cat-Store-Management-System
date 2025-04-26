@@ -2,17 +2,26 @@
     <AuthorizeView Roles="admin, salesman">
         <Authorized>
             <MudNavLink Href="/" Match="NavLinkMatch.All">仪表盘</MudNavLink>
-            <MudNavLink Href="/cat-infos" Match="NavLinkMatch.Prefix">猫咪信息管理</MudNavLink>
-            <MudNavLink Href="/commodities" Match="NavLinkMatch.Prefix">商品库存管理</MudNavLink>
-            <MudNavLink Href="/cat-orders" Match="NavLinkMatch.Prefix">猫咪订单管理</MudNavLink>
-            <MudNavLink Href="/commodity-orders" Match="NavLinkMatch.Prefix">商品订单管理</MudNavLink>
+            <MudNavLink Href="/cat-infos" Match="NavLinkMatch.Prefix">猫咪管理</MudNavLink>
+            <MudNavLink Href="/cat-breeds" Match="NavLinkMatch.Prefix">品种管理</MudNavLink>
+            <MudNavGroup Title="商品管理">
+                <MudNavLink Href="/commodities" Match="NavLinkMatch.Prefix">商品库存管理</MudNavLink>
+                <AuthorizeView Roles="admin">
+                    <Authorized>
+                        <MudNavLink Href="/purchase-orders" Match="NavLinkMatch.Prefix">商品进货管理</MudNavLink>
+                    </Authorized>
+                </AuthorizeView>
+            </MudNavGroup>
+            <MudNavGroup Title="订单管理">
+                <MudNavLink Href="/cat-orders" Match="NavLinkMatch.Prefix">猫咪订单管理</MudNavLink>
+                <MudNavLink Href="/commodity-orders" Match="NavLinkMatch.Prefix">商品订单管理</MudNavLink>
+            </MudNavGroup>
+            <MudNavLink Href="/appointments" Match="NavLinkMatch.Prefix">预约管理</MudNavLink>
         </Authorized>
     </AuthorizeView>
     <AuthorizeView Roles="admin">
         <Authorized>
-            <MudNavLink Href="/purchase-orders" Match="NavLinkMatch.Prefix">商品进货管理</MudNavLink>
-            @* <MudNavLink Href="/servers" Match="NavLinkMatch.Prefix">店内消耗管理</MudNavLink> *@
-            <MudNavLink Href="/employees" Match="NavLinkMatch.Prefix">店内员工管理</MudNavLink>
+            <MudNavLink Href="/employees" Match="NavLinkMatch.Prefix">员工管理</MudNavLink>
         </Authorized>
     </AuthorizeView>
 </MudNavMenu>

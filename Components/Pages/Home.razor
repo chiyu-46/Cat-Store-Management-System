@@ -15,47 +15,128 @@
         <br/>
         欢迎使用宠物店管理系统！
     </MudAlert>
-    <div class="d-flex flex-grow-1 gap-4 my-4">
-        <MudPaper Class="flex-auto d-flex pa-4" Width="50%" Elevation="4">
-            <div class="flex-grow-1">
-                <MudText Typo="Typo.h6" Color="Color.Primary" Class="mb-4">
-                    猫咪数量
-                </MudText>
-                <MudText Typo="Typo.h4">
-                    @catNum
-                </MudText>
-            </div>
-            <div class="d-flex align-end justify-end mud-height-full py-8">
-                <MudIcon Icon="@Icons.Material.Filled.Pets" Size="Size.Large" Color="Color.Primary"/>
-            </div>
+    <MudStack Row="true" StretchItems="StretchItems.All" Breakpoint="Breakpoint.Sm" Spacing="4" Class="ma-4">
+        <MudPaper Class="pa-4" Elevation="4">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudStack Justify="Justify.Center" Spacing="0">
+                    <MudText Typo="Typo.h6" Color="Color.Primary" Class="mb-4">
+                        猫咪数量
+                    </MudText>
+                    <MudText Typo="Typo.h4">
+                        @catNum
+                    </MudText>
+                </MudStack>
+                <MudAvatar Style="height:70px; width:70px; font-size:2rem;" Color="Color.Primary" Variant="Variant.Filled">
+                    <MudIcon Icon="@Icons.Material.Filled.Pets"  Size="Size.Large"/>
+                </MudAvatar>
+            </MudStack>
         </MudPaper>
-        <MudPaper Class="flex-auto d-flex pa-4" Width="50%" Elevation="4">
-            <div class="flex-grow-1">
-                <MudText Typo="Typo.h6" Color="Color.Primary" Class="mb-4">
-                    商品种数
-                </MudText>
-                <MudText Typo="Typo.h4">
-                    @commodityNum
-                </MudText>
-            </div>
-            <div class="d-flex align-end justify-end mud-height-full py-8">
-                <MudIcon Icon="@Icons.Material.Filled.Widgets" Size="Size.Large" Color="Color.Primary"/>
-            </div>
+        <MudPaper Class="pa-4" Elevation="4">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudStack Justify="Justify.Center" Spacing="0">
+                    <MudText Typo="Typo.h6" Color="Color.Primary" Class="mb-4">
+                        商品种数
+                    </MudText>
+                    <MudText Typo="Typo.h4">
+                        @commodityNum
+                    </MudText>
+                </MudStack>
+                <MudAvatar Style="height:70px; width:70px; font-size:2rem;" Color="Color.Primary" Variant="Variant.Filled">
+                    <MudIcon Icon="@Icons.Material.Filled.Widgets"  Size="Size.Large"/>
+                </MudAvatar>
+            </MudStack>
         </MudPaper>
-        <MudPaper Class="flex-auto d-flex pa-4" Width="50%" Elevation="4">
-            <div class="flex-grow-1">
-                <MudText Typo="Typo.h6" Color="Color.Primary" Class="mb-4">
-                    月营业额
-                </MudText>
-                <MudText Typo="Typo.h4">
-                    @turnover
-                </MudText>
-            </div>
-            <div class="d-flex align-end justify-end mud-height-full py-8">
-                <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Size="Size.Large" Color="Color.Primary"/>
-            </div>
+        <MudPaper Class="pa-4" Elevation="4">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudStack Justify="Justify.Center" Spacing="0">
+                    <MudText Typo="Typo.h6" Color="Color.Primary" Class="mb-4">
+                        月营业额
+                    </MudText>
+                    <MudText Typo="Typo.h4">
+                        @turnover
+                    </MudText>
+                </MudStack>
+                <MudAvatar Style="height:70px; width:70px; font-size:2rem;" Color="Color.Primary" Variant="Variant.Filled">
+                    <MudIcon Icon="@Icons.Material.Filled.AccountBalance"  Size="Size.Large"/>
+                </MudAvatar>
+            </MudStack>
         </MudPaper>
-    </div>
+    </MudStack>
+    @* <div class="d-flex flex-grow-1 gap-4 my-4"> *@
+    @*     <MudPaper Class="flex-auto d-flex pa-4" Width="50%" Elevation="4"> *@
+    @*         <div class="flex-grow-1"> *@
+    @*             <MudText Typo="Typo.h6" Color="Color.Primary" Class="mb-4"> *@
+    @*                 猫咪数量 *@
+    @*             </MudText> *@
+    @*             <MudText Typo="Typo.h4"> *@
+    @*                 @catNum *@
+    @*             </MudText> *@
+    @*         </div> *@
+    @*         <div class="d-flex align-end justify-end mud-height-full py-8"> *@
+    @*             <MudIcon Icon="@Icons.Material.Filled.Pets" Size="Size.Large" Color="Color.Primary"/> *@
+    @*         </div> *@
+    @*     </MudPaper> *@
+    @*     <MudPaper Class="flex-auto d-flex pa-4" Width="50%" Elevation="4"> *@
+    @*         <div class="flex-grow-1"> *@
+    @*             <MudText Typo="Typo.h6" Color="Color.Primary" Class="mb-4"> *@
+    @*                 商品种数 *@
+    @*             </MudText> *@
+    @*             <MudText Typo="Typo.h4"> *@
+    @*                 @commodityNum *@
+    @*             </MudText> *@
+    @*         </div> *@
+    @*         <div class="d-flex align-end justify-end mud-height-full py-8"> *@
+    @*             <MudIcon Icon="@Icons.Material.Filled.Widgets" Size="Size.Large" Color="Color.Primary"/> *@
+    @*         </div> *@
+    @*     </MudPaper> *@
+    @*     <MudPaper Class="flex-auto d-flex pa-4" Width="50%" Elevation="4"> *@
+    @*         <div class="flex-grow-1"> *@
+    @*             <MudText Typo="Typo.h6" Color="Color.Primary" Class="mb-4"> *@
+    @*                 月营业额 *@
+    @*             </MudText> *@
+    @*             <MudText Typo="Typo.h4"> *@
+    @*                 @turnover *@
+    @*             </MudText> *@
+    @*         </div> *@
+    @*         <div class="d-flex align-end justify-end mud-height-full py-8"> *@
+    @*             <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Size="Size.Large" Color="Color.Primary"/> *@
+    @*         </div> *@
+    @*     </MudPaper> *@
+    @* </div> *@
+    <MudStack Row="true" StretchItems="StretchItems.All" Breakpoint="Breakpoint.Sm" Class="my-4">
+        <MudDataGrid @ref="appointmentDataGrid" T="Appointment" ServerData="GetUpcomingAppointmentsAsync"
+                     Filterable="false" SortMode="@SortMode.None" Groupable="false"
+                     ReadOnly="true" Striped="true" Elevation="5" Class="ma-4 pa-4">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">临近的预约</MudText>
+            </ToolBarContent>
+            <Columns>
+                <PropertyColumn Property="o => o.CustomerName" Title="顾客称呼"/>
+                <PropertyColumn Property="o => o.ArrivalDateTime" Title="到达时间"/>
+                <PropertyColumn Property="o => o.Remark" Title="备注"/>
+            </Columns>
+            <PagerContent>
+                <MudDataGridPager T="Appointment" PageSizeOptions="@(new[] { 5 })"/>
+            </PagerContent>
+        </MudDataGrid>
+        <MudDataGrid @ref="commodityDataGrid" T="Commodity" ServerData="GetWarningCommoditiesAsync"
+                     Filterable="false" SortMode="@SortMode.None" Groupable="false"
+                     ReadOnly="true" Striped="true" Elevation="5" Class="ma-4 pa-4">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">库存预警</MudText>
+            </ToolBarContent>
+            <Columns>
+                <PropertyColumn Property="commodity => commodity.Brand" Title="品牌"/>
+                <PropertyColumn Property="commodity => commodity.NaturalCommodityType" Title="类型"/>
+                <PropertyColumn Property="commodity => commodity.Name" Title="商品名"/>
+                <PropertyColumn Property="commodity => commodity.QuantityInStock" Title="库存数量"/>
+                <PropertyColumn Property="commodity => commodity.Unit" Title="单位"/>
+            </Columns>
+            <PagerContent>
+                <MudDataGridPager T="Commodity" PageSizeOptions="@(new[] { 5 })"/>
+            </PagerContent>
+        </MudDataGrid>
+    </MudStack>
 </MudContainer>
 
 @code
@@ -65,6 +146,8 @@
     private decimal turnover;
 
     private CatStoreContext dbContext = default!;
+    private MudDataGrid<Appointment> appointmentDataGrid = default!;
+    private MudDataGrid<Commodity> commodityDataGrid = default!;
 
     protected override void OnInitialized()
     {
@@ -90,5 +173,50 @@
                    + await dbContext.CatOrder
                        .Where(co => co.TransactionTime >= firstDayOfMonth && co.TransactionTime <= lastDayOfMonth)
                        .SumAsync(co => co.Amount);
+    }
+
+    /// <summary>
+    /// 页面中“临近的预约”数据网格的数据源，用于获取数据。
+    /// </summary>
+    /// <param name="state">用于获取分页、排序信息。</param>
+    /// <returns>向数据网格提供数据。</returns>
+    private async Task<GridData<Appointment>> GetUpcomingAppointmentsAsync(GridState<Appointment> state)
+    {
+        var oneHourLateTime = DateTime.Now + TimeSpan.FromHours(1);
+        IQueryable<Appointment> query = dbContext.Appointment
+            .Where(o => o.ArrivalDateTime > DateTime.Now)
+            .Where(o => o.ArrivalDateTime < oneHourLateTime);
+
+        query = query.OrderByDescending(o => o.Id);
+
+        int totalItems = await query.CountAsync();
+        var pagedData = await query.Skip(state.Page * state.PageSize).Take(state.PageSize).ToArrayAsync();
+
+        return new GridData<Appointment>
+        {
+            TotalItems = totalItems,
+            Items = pagedData
+        };
+    }
+
+    /// <summary>
+    /// 页面中“库存预警”数据网格的数据源，用于获取数据。
+    /// </summary>
+    /// <param name="state">用于获取分页、排序信息。</param>
+    /// <returns>向数据网格提供数据。</returns>
+    private async Task<GridData<Commodity>> GetWarningCommoditiesAsync(GridState<Commodity> state)
+    {
+        IQueryable<Commodity> query = dbContext.Commodity.Where(o => o.QuantityInStock < 100);
+
+        query = query.OrderByDescending(o => o.Id);
+
+        int totalItems = await query.CountAsync();
+        var pagedData = await query.Skip(state.Page * state.PageSize).Take(state.PageSize).ToArrayAsync();
+
+        return new GridData<Commodity>
+        {
+            TotalItems = totalItems,
+            Items = pagedData
+        };
     }
 }

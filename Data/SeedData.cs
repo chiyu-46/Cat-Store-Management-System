@@ -21,7 +21,7 @@ public static class SeedData
             serviceProvider.GetRequiredService<DbContextOptions<CatStoreContext>>());
 
         // 判断数据库上下文或数据表是否为空
-        if (context?.CatInfo == null || context?.Commodity == null)
+        if (context?.CatInfo == null)
         {
             throw new NullReferenceException(
                 "Null CatStoreContext or DbSet");
@@ -29,6 +29,40 @@ public static class SeedData
 
         // 是否填充过数据的标志
         bool isChanged = false;
+
+        List<CatBreed> catBreeds = [];
+
+        // 如果数据库表 CatBreed 中没有数据，则填充以下数据
+        if (!context.CatBreed.Any())
+        {
+            isChanged = true;
+            catBreeds.AddRange(
+                new CatBreed()
+                {
+                    BreedName = "美国短毛猫"
+                },
+                new CatBreed()
+                {
+                    BreedName = "英国短毛猫"
+                },
+                new CatBreed()
+                {
+                    BreedName = "中国狸花猫"
+                },
+                new CatBreed()
+                {
+                    BreedName = "缅因猫"
+                },
+                new CatBreed()
+                {
+                    BreedName = "波斯猫"
+                },
+                new CatBreed()
+                {
+                    BreedName = "布偶猫"
+                });
+            context.CatBreed.AddRange(catBreeds);
+        }
 
         // 如果数据库表 CatInfo 中没有数据，则填充以下数据
         if (!context.CatInfo.Any())
@@ -39,7 +73,7 @@ public static class SeedData
                 {
                     Name = "小白",
                     Gender = true,
-                    CatBreed = CatBreed.Ragdoll,
+                    CatBreed = catBreeds[0],
                     Birthday = new DateOnly(2022, 4, 12),
                     CatState = CatState.ForSale,
                 },
@@ -47,7 +81,7 @@ public static class SeedData
                 {
                     Name = "小花",
                     Gender = true,
-                    CatBreed = CatBreed.ChineseLiHua,
+                    CatBreed = catBreeds[2],
                     Birthday = new DateOnly(2025, 2, 12),
                     CatState = CatState.ForSale,
                 },
@@ -55,15 +89,15 @@ public static class SeedData
                 {
                     Name = "球球",
                     Gender = false,
-                    CatBreed = CatBreed.MaineCoon,
+                    CatBreed = catBreeds[5],
                     Birthday = new DateOnly(2022, 10, 6),
-                    CatState = CatState.Sold,
+                    CatState = CatState.ForSale,
                 },
                 new CatInfo()
                 {
                     Name = "香子兰",
                     Gender = true,
-                    CatBreed = CatBreed.Persian,
+                    CatBreed = catBreeds[4],
                     Birthday = new DateOnly(2024, 3, 2),
                     CatState = CatState.ForSale,
                 },
@@ -71,9 +105,9 @@ public static class SeedData
                 {
                     Name = "巧克力",
                     Gender = true,
-                    CatBreed = CatBreed.Persian,
+                    CatBreed = catBreeds[4],
                     Birthday = new DateOnly(2022, 5, 1),
-                    CatState = CatState.Sold,
+                    CatState = CatState.ForSale,
                 });
         }
 
@@ -163,6 +197,37 @@ public static class SeedData
                     Unit = "台",
                 });
         }
+        
+        // 如果数据库表 Appointment 中没有数据，则填充以下数据
+        if (!context.Appointment.Any())
+        {
+            isChanged = true;
+            context.Appointment.AddRange(
+                new Appointment()
+                {
+                    CustomerName = "张先生",
+                    ArrivalDateTime = DateTime.Now + TimeSpan.FromMinutes(30),
+                    Remark = "看猫"
+                },
+                new Appointment()
+                {
+                    CustomerName = "王女士",
+                    ArrivalDateTime = DateTime.Now + TimeSpan.FromMinutes(60),
+                    Remark = "买猫粮"
+                },
+                new Appointment()
+                {
+                    CustomerName = "李先生",
+                    ArrivalDateTime = DateTime.Now + TimeSpan.FromMinutes(90),
+                    Remark = "买逗猫棒"
+                },
+                new Appointment()
+                {
+                    CustomerName = "廖大爷",
+                    ArrivalDateTime = DateTime.Now + TimeSpan.FromMinutes(120),
+                    Remark = "看猫"
+                });
+        }
 
         // 若填充过任何数据，则保存更改
         if (isChanged)
@@ -190,7 +255,7 @@ public static class SeedData
             result = await roleManager.CreateAsync(new IdentityRole("salesman"));
             CheckResult("创建角色salesman");
         }
-        
+
         using var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
         // 若数据库中不存在用户，则填充数据
@@ -207,7 +272,7 @@ public static class SeedData
             CheckResult("创建用户1");
             result = await userManager.AddToRoleAsync(adminUser, "admin");
             CheckResult("用户1配置角色");
-                
+
             var salesmanUser = new ApplicationUser()
             {
                 UserName = "xiaoshi",

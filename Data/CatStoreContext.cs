@@ -5,6 +5,7 @@ namespace CatStore.Data
 {
     public class CatStoreContext(DbContextOptions<CatStoreContext> options) : DbContext(options)
     {
+        public DbSet<CatBreed> CatBreed { get; set; } = default!;
         public DbSet<CatInfo> CatInfo { get; set; } = default!;
         public DbSet<Commodity> Commodity { get; set; } = default!;
         public DbSet<CatOrder> CatOrder { get; set; } = default!;
@@ -12,6 +13,7 @@ namespace CatStore.Data
         public DbSet<OrderItem> OrderItem { get; set; } = default!;
         public DbSet<PurchaseOrder> PurchaseOrder { get; set; } = default!;
         public DbSet<PurchaseOrderItem> PurchaseOrderItem { get; set; } = default!;
+        public DbSet<Appointment> Appointment { get; set; } = default!;
 
         // 懒加载的可能带来性能问题，放弃使用
         // protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -23,6 +25,12 @@ namespace CatStore.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            // 配置 CatBreed 和 CatInfo 的关系（猫咪种类与猫咪）
+            modelBuilder.Entity<CatBreed>()
+                .HasMany(e => e.Cats)
+                .WithOne(e => e.CatBreed)
+                .HasForeignKey(e => e.CatBreedId)
+                .OnDelete(DeleteBehavior.Cascade);
             // 配置 CatOrder 和 CatInfo 的关系（猫咪订单与猫咪）
             modelBuilder.Entity<CatInfo>()
                 .HasMany(e => e.CatOrders)

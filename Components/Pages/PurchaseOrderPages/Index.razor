@@ -149,6 +149,10 @@
         {
             await dataGrid.ReloadServerData();
         }
+        else
+        {
+            dbContext.ChangeTracker.Clear();
+        }
     }
 
     /// <summary>
@@ -168,6 +172,10 @@
         if (!result!.Canceled)
         {
             await dataGrid.ReloadServerData();
+        }
+        else
+        {
+            dbContext.ChangeTracker.Clear();
         }
     }
 

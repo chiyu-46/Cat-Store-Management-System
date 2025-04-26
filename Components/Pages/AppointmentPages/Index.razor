@@ -1,4 +1,4 @@
-﻿@page "/cat-orders"
+﻿@page "/appointments"
 @attribute [Authorize]
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
@@ -9,55 +9,42 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
-<PageTitle>猫咪订单管理</PageTitle>
+<PageTitle>预约管理</PageTitle>
 
-<MudDataGrid @ref="dataGrid" T="CatOrder" ServerData="GetCatOrdersAsync"
+<MudDataGrid @ref="dataGrid" T="Appointment" ServerData="GetAppointmentsAsync"
              ReadOnly="true" EditMode="DataGridEditMode.Form"
              EditTrigger="DataGridEditTrigger.Manual"
              Striped="true" Elevation="5" Class="ma-4 pa-4">
     <ToolBarContent>
-        <MudText Typo="Typo.h6">猫咪订单管理</MudText>
+        <MudText Typo="Typo.h6">预约管理</MudText>
         <MudSpacer/>
-        <MudButton @onclick="AddCatOrderAsync" Variant="Variant.Filled" Color="Color.Success">添加新猫咪订单</MudButton>
+        <MudStack Row="true" Spacing="3">
+            <MudButton @onclick="AddAppointmentAsync" Variant="Variant.Filled" Color="Color.Success">添加预约</MudButton>
+            <MudButton @onclick="DeleteOutOfDateAppointmentAsync" Variant="Variant.Filled" Color="Color.Error">清理过期预约</MudButton>
+        </MudStack>
     </ToolBarContent>
     <Columns>
-        <HierarchyColumn T="CatOrder"/>
-        <PropertyColumn Property="catOrder => catOrder.CustomerPhone" Title="顾客电话"/>
-        <PropertyColumn Property="catOrder => catOrder.TransactionTime" Title="交易时间"/>
-        <PropertyColumn Property="catOrder => catOrder.CatInfo.Name" Title="猫咪名字"/>
-        <PropertyColumn Property="catOrder => catOrder.Amount" Title="金额"/>
+        <PropertyColumn Property="o => o.CustomerName" Title="顾客称呼"/>
+        <PropertyColumn Property="o => o.ArrivalDateTime" Title="到达时间"/>
+        <PropertyColumn Property="o => o.Remark" Title="备注"/>
         <TemplateColumn>
             <CellTemplate>
                 <MudStack Row>
                     <MudIconButton Size="@Size.Small" Icon="@Icons.Material.Outlined.Edit"
-                                   OnClick="@(() => UpdateCatOrderAsync(context.Item!.OrderId))"/>
+                                   OnClick="@(() => UpdateAppointmentAsync(context.Item!.Id))"/>
                     <MudIconButton Size="@Size.Small" Icon="@Icons.Material.Outlined.DeleteForever"
                                    OnClick="@(() => OnDeleteButtonClickedAsync(context.Item))"/>
                 </MudStack>
             </CellTemplate>
         </TemplateColumn>
     </Columns>
-    <ChildRowContent>
-        <MudCard>
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudText Typo="Typo.h6">@context.Item.CatInfo.Name</MudText>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
-                <MudText>品种： @context.Item.CatInfo.CatBreed.BreedName</MudText>
-                <MudText>性别： @context.Item.CatInfo.GetNaturalGender()</MudText>
-                <MudText>生日： @context.Item.CatInfo.Birthday</MudText>
-            </MudCardContent>
-        </MudCard>
-    </ChildRowContent>
     <PagerContent>
-        <MudDataGridPager T="CatOrder" PageSizeOptions="@(new[] { 5, 10, 20 })"/>
+        <MudDataGridPager T="Appointment" PageSizeOptions="@(new[] { 5, 10, 20 })"/>
     </PagerContent>
 </MudDataGrid>
 
 @code {
-    private MudDataGrid<CatOrder> dataGrid = default!;
+    private MudDataGrid<Appointment> dataGrid = default!;
 
     private CatStoreContext dbContext = default!;
 
@@ -69,32 +56,30 @@
     public async ValueTask DisposeAsync() => await dbContext.DisposeAsync();
 
     /// <summary>
-    /// 页面中数据网格的数据源，用于获取猫咪订单数据。
+    /// 页面中数据网格的数据源，用于获取预约数据。
     /// </summary>
     /// <param name="state">用于获取分页、排序信息。</param>
     /// <returns>向数据网格提供数据。</returns>
-    private async Task<GridData<CatOrder>> GetCatOrdersAsync(GridState<CatOrder> state)
+    private async Task<GridData<Appointment>> GetAppointmentsAsync(GridState<Appointment> state)
     {
-        IQueryable<CatOrder> query = dbContext.CatOrder;
+        IQueryable<Appointment> query = dbContext.Appointment;
 
         var sortDefinition = state.SortDefinitions.FirstOrDefault();
         if (sortDefinition != null)
         {
             query = sortDefinition.SortBy switch
             {
-                nameof(CatOrder.Amount) => sortDefinition.Descending ? query.OrderByDescending(co => co.Amount) : query.OrderBy(co => co.Amount),
-                nameof(CatOrder.TransactionTime) => sortDefinition.Descending ? query.OrderByDescending(co => co.TransactionTime) : query.OrderBy(co => co.TransactionTime),
-                _ => query.OrderByDescending(co => co.OrderId)
+                nameof(Appointment.CustomerName) => sortDefinition.Descending ? query.OrderByDescending(o => o.CustomerName) : query.OrderBy(o => o.CustomerName),
+                nameof(Appointment.ArrivalDateTime) => sortDefinition.Descending ? query.OrderByDescending(o => o.ArrivalDateTime) : query.OrderBy(o => o.ArrivalDateTime),
+                nameof(Appointment.Remark) => sortDefinition.Descending ? query.OrderByDescending(o => o.Remark) : query.OrderBy(o => o.Remark),
+                _ => query.OrderByDescending(o => o.Id)
             };
         }
 
         int totalItems = await query.CountAsync();
-        var pagedData = await query.Skip(state.Page * state.PageSize).Take(state.PageSize)
-            .Include(o => o.CatInfo)
-            .ThenInclude(o => o.CatBreed)
-            .ToArrayAsync();
+        var pagedData = await query.Skip(state.Page * state.PageSize).Take(state.PageSize).ToArrayAsync();
 
-        return new GridData<CatOrder>
+        return new GridData<Appointment>
         {
             TotalItems = totalItems,
             Items = pagedData
@@ -105,7 +90,7 @@
     /// 当用户点击删除按钮时触发，用于弹出删除确认对话框。
     /// </summary>
     /// <param name="item">要删除的一条数据。</param>
-    private async Task OnDeleteButtonClickedAsync(CatOrder? item)
+    private async Task OnDeleteButtonClickedAsync(Appointment? item)
     {
         bool? result = await DialogService.ShowMessageBox(
             "警告",
@@ -115,9 +100,7 @@
         {
             if (item != null)
             {
-                dbContext.CatOrder.Remove(item);
-                // 猫咪订单消失，猫咪重新回到待售状态。
-                item.CatInfo.CatState = CatState.ForSale;
+                dbContext.Appointment.Remove(item);
                 try
                 {
                     await dbContext.SaveChangesAsync();
@@ -139,16 +122,29 @@
     }
 
     /// <summary>
-    /// 显示添加猫咪订单对话框。
+    /// 清理过期预约。
     /// </summary>
-    private async Task AddCatOrderAsync()
+    private async Task DeleteOutOfDateAppointmentAsync()
     {
-        var parameters = new DialogParameters<CreateOrEditACatOrder>
+        var items = await (from appointment in dbContext.Appointment
+            where appointment.ArrivalDateTime < DateTime.Now
+            select appointment).ToArrayAsync();
+        dbContext.Appointment.RemoveRange(items);
+        await dbContext.SaveChangesAsync();
+        await dataGrid.ReloadServerData();
+    }
+    
+    /// <summary>
+    /// 显示添加预约对话框。
+    /// </summary>
+    private async Task AddAppointmentAsync()
+    {
+        var parameters = new DialogParameters<CreateOrEditAnAppointment>
         {
             { x => x.dbContext, dbContext },
             { x => x.IsCreate, true }
         };
-        var dialog = await DialogService.ShowAsync<CreateOrEditACatOrder>("添加新猫咪订单", parameters);
+        var dialog = await DialogService.ShowAsync<CreateOrEditAnAppointment>("添加预约", parameters);
         var result = await dialog.Result;
 
         if (!result!.Canceled)
@@ -162,17 +158,17 @@
     }
 
     /// <summary>
-    /// 显示修改猫咪订单对话框。
+    /// 显示修改预约对话框。
     /// </summary>
-    private async Task UpdateCatOrderAsync(int orderId)
+    private async Task UpdateAppointmentAsync(int appointmentId)
     {
-        var parameters = new DialogParameters<CreateOrEditACatOrder>
+        var parameters = new DialogParameters<CreateOrEditAnAppointment>
         {
             { x => x.dbContext, dbContext },
             { x => x.IsCreate, false },
-            { x => x.OrderId, orderId },
+            { x => x.AppointmentId, appointmentId },
         };
-        var dialog = await DialogService.ShowAsync<CreateOrEditACatOrder>("修改新猫咪订单", parameters);
+        var dialog = await DialogService.ShowAsync<CreateOrEditAnAppointment>("修改预约", parameters);
         var result = await dialog.Result;
 
         if (!result!.Canceled)

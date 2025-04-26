@@ -1,0 +1,127 @@
+﻿@using CatStore.Models
+@using CatStore.Data
+@inject ISnackbar Snackbar
+
+<EditForm Model="@TheAppointment" OnValidSubmit="() => IsCreate? AddAppointment():UpdateAppointment()"
+          FormName="create-appointment" Enhance>
+    <DataAnnotationsValidator/>
+    <MudDialog>
+        <TitleContent>
+            <MudText>
+                <MudIcon Icon="@Icons.Material.Outlined.Add" Class="mr-3 mb-n1"/>
+                @(IsCreate ? "添加预约" : "修改预约")
+            </MudText>
+        </TitleContent>
+        <DialogContent>
+            <MudTextField Label="顾客称呼" @bind-Value="TheAppointment.CustomerName" 
+                          Required="true" RequiredError="顾客称呼是必须的！"
+                          For="() => TheAppointment.CustomerName"/>
+            <MudPaper Class="d-flex flex-grow-1 gap-4 pa-4">
+                <MudDatePicker @bind-Date="_dateTime" Label="预约日期" MinDate="DateTime.Now" Required
+                               RequiredError="必须指定预约日期！"
+                               Class="flex-1 d-flex"/>
+                <MudTimePicker Label="预约时间" Editable="true" @bind-Time="ArrivalTime"
+                               Required RequiredError="必须指定预约时间！"
+                               Validation="@(new Func<TimeSpan?, string>(CheckArrivalTime))"
+                               Class="flex-1 d-flex"/>
+            </MudPaper>
+            <MudTextField Label="备注" @bind-Value="TheAppointment.Remark" 
+                          For="() => TheAppointment.Remark"/>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="Cancel">取消</MudButton>
+            <MudButton ButtonType="ButtonType.Submit" Color="Color.Success">@(IsCreate ? "添加" : "更新")</MudButton>
+        </DialogActions>
+    </MudDialog>
+</EditForm>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public CatStoreContext dbContext { get; set; } = default!;
+
+    [Parameter] public bool IsCreate { get; set; }
+
+    [Parameter] public int AppointmentId { get; set; }
+
+    // 代表表单中的数据
+    private Appointment TheAppointment { get; set; } = new();
+    // 用于日期选择器
+    private DateTime? _dateTime
+    {
+        get => TheAppointment.ArrivalDateTime;
+        set
+        {
+            if (value.HasValue)
+            {
+                TheAppointment.ArrivalDateTime = value.Value;
+            }
+        }
+    }
+    // 用于时间选择器
+    private TimeSpan? ArrivalTime
+    {
+        get => TheAppointment.ArrivalDateTime.TimeOfDay;
+        set
+        {
+            if (value.HasValue)
+            {
+                TheAppointment.ArrivalDateTime = TheAppointment.ArrivalDateTime.Date + value.Value;
+            }
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        if (!IsCreate)
+        {
+            TheAppointment = (from appointment in dbContext.Appointment
+                    where appointment.Id == AppointmentId
+                    select appointment)
+                .First();
+        }
+        else
+        {
+            TheAppointment.ArrivalDateTime = DateTime.Now + TimeSpan.FromHours(1);
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    /// <summary>
+    /// 添加预约到数据库，显示结果信息，并关闭本对话框。
+    /// </summary>
+    private async Task AddAppointment()
+    {
+        dbContext.Appointment.Add(TheAppointment);
+        await dbContext.SaveChangesAsync();
+        Snackbar.Add("添加成功！", Severity.Success);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    /// <summary>
+    /// 修改预约。
+    /// </summary>
+    private async Task UpdateAppointment()
+    {
+        await dbContext.SaveChangesAsync();
+        Snackbar.Add("修改成功！", Severity.Success);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    /// <summary>
+    /// 检查预约时间是否早于现在的验证器。
+    /// </summary>
+    /// <param name="timeSpan">用户输入的时间。未使用，仅用于符合验证器参数要求。</param>
+    /// <returns>如果预约早于现在，则返回错误提示。</returns>
+    private string CheckArrivalTime(TimeSpan? timeSpan)
+    {
+        if (TheAppointment.ArrivalDateTime < DateTime.Now)
+        {
+            return "预约时间不能早于现在！";
+        }
+
+        return null;
+    }
+}

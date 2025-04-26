@@ -23,11 +23,13 @@ public class CatInfo
     [Required]
     [Display(Name = "性别")]
     public bool Gender { get; set; }
+    
+    // 外键关联到 CatBreed 模型
+    [ForeignKey("CatBreed")]
+    public int CatBreedId { get; set; }
 
-    [Required]
-    [Display(Name = "品种")]
-    [EnumDataType(typeof(CatBreed))]
-    public CatBreed CatBreed { get; set; }
+    // 导航属性
+    public virtual CatBreed CatBreed { get; set; } = default!;
 
     [Display(Name = "出生日")] public DateOnly Birthday { get; set; }
 
@@ -81,25 +83,6 @@ public class CatInfo
     public static string ConvertGenderToNaturalLanguage(bool gender) => gender ? "♀" : "♂";
 
     /// <summary>
-    /// 将数据库中存储的 CatBreed 类型的品种，转化成自然语言的品种描述。
-    /// </summary>
-    /// <param name="catBreed">来自数据库的品种原始数据。</param>
-    /// <returns>自然语言的品种描述。</returns>
-    public static string ConvertCatBreedToNaturalLanguage(CatBreed catBreed)
-    {
-        return catBreed switch
-        {
-            CatBreed.AmericanShorthair => "美国短毛猫",
-            CatBreed.BritishShorthair => "英国短毛猫",
-            CatBreed.ChineseLiHua => "中国狸花猫",
-            CatBreed.MaineCoon => "缅因猫",
-            CatBreed.Persian => "波斯猫",
-            CatBreed.Ragdoll => "布偶猫",
-            _ => throw new ArgumentOutOfRangeException(nameof(catBreed), catBreed, null)
-        };
-    }
-
-    /// <summary>
     /// 将数据库中存储的 CatState 类型的状态，转化成自然语言的状态描述。
     /// </summary>
     /// <param name="catState">来自数据库的状态原始数据。</param>
@@ -124,15 +107,6 @@ public class CatInfo
     }
 
     /// <summary>
-    /// 得到本实例代表的猫咪用自然语言描述的品种。
-    /// </summary>
-    /// <returns>用自然语言描述的品种。</returns>
-    public string GetNaturalCatBreed()
-    {
-        return ConvertCatBreedToNaturalLanguage(CatBreed);
-    }
-
-    /// <summary>
     /// 得到本实例代表的猫咪用自然语言描述的状态。
     /// </summary>
     /// <returns>用自然语言描述的状态。</returns>
@@ -140,42 +114,6 @@ public class CatInfo
     {
         return ConvertCatStateToNaturalLanguage(CatState);
     }
-}
-
-/// <summary>
-/// 定义猫咪品种的枚举。
-/// </summary>
-public enum CatBreed
-{
-    /// <summary>
-    /// 美国短毛猫。
-    /// </summary>
-    AmericanShorthair,
-
-    /// <summary>
-    /// 英国短毛猫。
-    /// </summary>
-    BritishShorthair,
-
-    /// <summary>
-    /// 中国狸花猫。
-    /// </summary>
-    ChineseLiHua,
-
-    /// <summary>
-    /// 缅因猫。
-    /// </summary>
-    MaineCoon,
-
-    /// <summary>
-    /// 波斯猫。
-    /// </summary>
-    Persian,
-
-    /// <summary>
-    /// 布偶猫。
-    /// </summary>
-    Ragdoll,
 }
 
 /// <summary>

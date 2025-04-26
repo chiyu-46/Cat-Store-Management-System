@@ -1,0 +1,100 @@
+﻿@using CatStore.Models
+@using CatStore.Data
+@using Microsoft.EntityFrameworkCore
+@inject ISnackbar Snackbar
+
+<EditForm Model="@TheCatInfo" OnValidSubmit="() => IsCreate? AddCatInfo():UpdateCatInfo()"
+          FormName="create-cat-info" Enhance>
+    <DataAnnotationsValidator/>
+    <MudDialog>
+        <TitleContent>
+            <MudText>
+                <MudIcon Icon="@Icons.Material.Outlined.Add" Class="mr-3 mb-n1"/>
+                @(IsCreate ? "添加猫咪" : "修改猫咪信息")
+            </MudText>
+        </TitleContent>
+        <DialogContent>
+            <MudTextField Label="名字" HelperText="最少两个字"
+                          @bind-Value="TheCatInfo.Name" For="@(() => TheCatInfo.Name)"/>
+            <MudSelect @bind-Value="TheCatInfo.Gender" For="@(() => TheCatInfo.Gender)" Label="性别">
+                <MudSelectItem Value="true">@CatInfo.ConvertGenderToNaturalLanguage(true)</MudSelectItem>
+                <MudSelectItem Value="false">@CatInfo.ConvertGenderToNaturalLanguage(false)</MudSelectItem>
+            </MudSelect>
+            <MudAutocomplete Label="品种" T="CatBreed" @bind-Value="TheCatInfo.CatBreed" For="@(() => TheCatInfo.CatBreed)" 
+                             Required="true"
+                             SearchFunc="async (value, token) => { return await CatBreed.SearchCatBreed(dbContext,value,token);}"
+                             ToStringFunc="@(x => x!.BreedName)"
+                             CoerceText="true" ResetValueOnEmptyText="false"
+                             ShowProgressIndicator="true" ProgressIndicatorColor="Color.Default"
+                             Strict="false" Class="flex-1 d-flex"/>
+            <MudDatePicker @bind-Date="TheCatInfo.BirthdayWithTime" Label="出生日" MaxDate="DateTime.Now" Required
+                           RequiredError="必须指定出生日！"
+                           Validation="@(new Func<DateTime?, IEnumerable<string>>(CatInfo.ValidateBirthday))"/>
+            <MudSelect @bind-Value="TheCatInfo.CatState" For="@(() => TheCatInfo.CatState)" Label="状态"
+                       ReadOnly="true" HelperText="只能通过订单管理修改此信息">
+                @foreach (CatState item in Enum.GetValues(typeof(CatState)))
+                {
+                    <MudSelectItem Value="@item">@CatInfo.ConvertCatStateToNaturalLanguage(item)</MudSelectItem>
+                }
+            </MudSelect>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="Cancel">取消</MudButton>
+            <MudButton ButtonType="ButtonType.Submit" Color="Color.Success">@(IsCreate ? "添加" : "更新")</MudButton>
+        </DialogActions>
+    </MudDialog>
+</EditForm>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public CatStoreContext dbContext { get; set; } = default!;
+
+    [Parameter] public bool IsCreate { get; set; }
+
+    [Parameter] public int CatInfoId { get; set; }
+
+    // 代表表单中的数据
+    private CatInfo TheCatInfo { get; set; } = new();
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        if (!IsCreate)
+        {
+            TheCatInfo = (from catInfo in dbContext.CatInfo
+                    where catInfo.Id == CatInfoId
+                    select catInfo)
+                .Include(o => o.CatBreed)
+                .First();
+        }
+        else
+        {
+            TheCatInfo.Birthday = DateOnly.FromDateTime(DateTime.Now);
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    /// <summary>
+    /// 添加猫咪到数据库，显示结果信息，并关闭本对话框。
+    /// </summary>
+    private async Task AddCatInfo()
+    {
+        dbContext.CatInfo.Add(TheCatInfo);
+        await dbContext.SaveChangesAsync();
+        Snackbar.Add("添加成功！", Severity.Success);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    /// <summary>
+    /// 修改猫咪信息。
+    /// </summary>
+    private async Task UpdateCatInfo()
+    {
+        await dbContext.SaveChangesAsync();
+        Snackbar.Add("修改成功！", Severity.Success);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+}

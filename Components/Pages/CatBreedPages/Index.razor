@@ -1,4 +1,4 @@
-﻿@page "/commodities"
+﻿@page "/cat-breeds"
 @attribute [Authorize]
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
@@ -9,38 +9,22 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
-<PageTitle>商品库存管理</PageTitle>
+<PageTitle>品种管理</PageTitle>
 
-<MudDataGrid T="Commodity" Items="dbContext.Commodity" ReadOnly="readOnly" EditMode="DataGridEditMode.Form"
+<MudDataGrid T="CatBreed" Items="dbContext.CatBreed" ReadOnly="readOnly"
+             EditMode="DataGridEditMode.Form"
              EditTrigger="DataGridEditTrigger.Manual" StartedEditingItem="StartedEditingItem"
              CanceledEditingItem="CanceledEditingItem" CommittedItemChanges="CommittedItemChangesAsync"
              Striped="true" Elevation="5" Class="ma-4 pa-4">
     <ToolBarContent>
-        <MudText Typo="Typo.h6">商品库存管理</MudText>
+        <MudText Typo="Typo.h6">品种管理</MudText>
         <MudSpacer/>
-        <MudButton @onclick="AddCommodityAsync" Variant="Variant.Filled" Color="Color.Success">添加新商品</MudButton>
+        <MudButton @onclick="AddCatBreedAsync" Variant="Variant.Filled" Color="Color.Success">添加品种</MudButton>
     </ToolBarContent>
     <Columns>
-        <PropertyColumn Property="commodity => commodity.Brand" Title="品牌"/>
-        <PropertyColumn Property="commodity => commodity.NaturalCommodityType" Title="类型">
-            <EditTemplate>
-                <MudSelect @bind-Value="context.Item.CommodityType" Label="类型" Required RequiredError="必须选择类型！">
-                    @foreach (CommodityType item in Enum.GetValues(typeof(CommodityType)))
-                    {
-                        <MudSelectItem
-                            Value="@item">@Commodity.ConvertCommodityTypeToNaturalLanguage(item)</MudSelectItem>
-                    }
-                </MudSelect>
-            </EditTemplate>
-        </PropertyColumn>
-        <PropertyColumn Property="commodity => commodity.Name" Title="商品名"/>
-        <PropertyColumn Property="commodity => commodity.QuantityInStock" Title="库存数量">
-            <EditTemplate>
-                <MudNumericField @bind-Value="context.Item.QuantityInStock" Label="库存数量" Variant="Variant.Text"
-                                 Min="0"/>
-            </EditTemplate>
-        </PropertyColumn>
-        <PropertyColumn Property="commodity => commodity.Unit" Title="单位"/>
+        <PropertyColumn Property="o =>o.BreedName" Title="品种名称"/>
+        <PropertyColumn Property="o => o.Remark" Title="备注" />
+        
         <TemplateColumn>
             <CellTemplate>
                 <MudStack Row>
@@ -53,15 +37,15 @@
         </TemplateColumn>
     </Columns>
     <PagerContent>
-        <MudDataGridPager T="Commodity" PageSizeOptions="@(new[] { 5, 10, 20 })"/>
+        <MudDataGridPager T="CatBreed" PageSizeOptions="@(new[] { 5, 10, 20 })"/>
     </PagerContent>
 </MudDataGrid>
 
 @code {
+    [CascadingParameter] private Task<AuthenticationState>? authenticationState { get; set; }
+
     private CatStoreContext dbContext = default!;
 
-    [CascadingParameter] private Task<AuthenticationState>? authenticationState { get; set; }
-    
     // 此表格是否只读。
     // 可用于根据授权确定用户是否有权限更改此表格内容。
     // 可以使用 Editable 属性，控制单独的列是否可编辑。
@@ -92,7 +76,7 @@
     /// 用户开始对表格中某条信息的编辑时，触发此事件。
     /// </summary>
     /// <param name="item">正在被用户编辑的这条信息。</param>
-    private void StartedEditingItem(Commodity item)
+    private void StartedEditingItem(CatBreed item)
     {
     }
 
@@ -100,7 +84,7 @@
     /// 用户取消对表格中某条信息的编辑时，触发此事件。
     /// </summary>
     /// <param name="item">正在被用户编辑的这条信息。</param>
-    private void CanceledEditingItem(Commodity item)
+    private void CanceledEditingItem(CatBreed item)
     {
     }
 
@@ -108,8 +92,16 @@
     /// 用户提交对表格中某条信息的编辑时，触发此事件。
     /// </summary>
     /// <param name="item">正在被用户编辑的这条信息。</param>
-    private async Task CommittedItemChangesAsync(Commodity item)
+    private async Task CommittedItemChangesAsync(CatBreed item)
     {
+        // 检查是否存在同名记录，有则取消更新
+        if (await dbContext.CatBreed.AnyAsync(o => o.BreedName == item.BreedName))
+        {
+            Snackbar.Add("猫咪品种不可重复！", Severity.Error);
+            dbContext.ChangeTracker.Clear();
+            StateHasChanged();
+            return;
+        }
         try
         {
             await dbContext.SaveChangesAsync();
@@ -125,16 +117,17 @@
     /// 当用户点击删除按钮时触发，用于弹出删除确认对话框。
     /// </summary>
     /// <param name="item">要删除的一条数据。</param>
-    private async Task OnDeleteButtonClickedAsync(Commodity? item)
+    private async Task OnDeleteButtonClickedAsync(CatBreed? item)
     {
-        // 如果此商品有关联的订单，则禁止删除
-        if (dbContext.OrderItem.Any(x => x.CommodityId == item!.Id) 
-            || dbContext.PurchaseOrderItem.Any(x => x.CommodityId == item!.Id))
+        // 检查品种下是否存在猫咪，存在则不允许删除
+        int catCount = dbContext.CatBreed.Where(o => o.Id == item.Id)
+            .Include(o => o.Cats)
+            .First().Cats.Count;
+        if (catCount > 0)
         {
-            Snackbar.Add("此商品存在关联订单，无法删除！", Severity.Error);
+            Snackbar.Add("当前品种已有猫咪存在，禁止删除！", Severity.Error);
             return;
         }
-
         bool? result = await DialogService.ShowMessageBox(
             "警告",
             "删除后无法恢复！",
@@ -143,7 +136,7 @@
         {
             if (item != null)
             {
-                dbContext.Commodity.Remove(item);
+                dbContext.CatBreed.Remove(item);
                 try
                 {
                     await dbContext.SaveChangesAsync();
@@ -154,7 +147,6 @@
                 }
                 finally
                 {
-                    Snackbar.Add("删除成功！", Severity.Success);
                     StateHasChanged();
                 }
             }
@@ -166,11 +158,11 @@
     }
 
     /// <summary>
-    /// 显示添加猫咪对话框。
+    /// 显示添加品种对话框。
     /// </summary>
-    private async Task AddCommodityAsync()
+    private async Task AddCatBreedAsync()
     {
-        var dialog = await DialogService.ShowAsync<CreateCommodity>("添加新商品");
+        var dialog = await DialogService.ShowAsync<CreateCatBreed>("添加品种");
         var result = await dialog.Result;
 
         if (!result!.Canceled)
