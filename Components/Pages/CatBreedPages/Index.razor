@@ -50,6 +50,8 @@
     // 可用于根据授权确定用户是否有权限更改此表格内容。
     // 可以使用 Editable 属性，控制单独的列是否可编辑。
     private bool readOnly = false;
+    // 记录用户修改品种时的原始副本
+    private CatBreed? tempCatBreed;
 
     protected override async Task OnInitializedAsync()
     {
@@ -78,6 +80,7 @@
     /// <param name="item">正在被用户编辑的这条信息。</param>
     private void StartedEditingItem(CatBreed item)
     {
+        tempCatBreed = item;
     }
 
     /// <summary>
@@ -86,6 +89,7 @@
     /// <param name="item">正在被用户编辑的这条信息。</param>
     private void CanceledEditingItem(CatBreed item)
     {
+        tempCatBreed = null;
     }
 
     /// <summary>
@@ -94,8 +98,9 @@
     /// <param name="item">正在被用户编辑的这条信息。</param>
     private async Task CommittedItemChangesAsync(CatBreed item)
     {
-        // 检查是否存在同名记录，有则取消更新
-        if (await dbContext.CatBreed.AnyAsync(o => o.BreedName == item.BreedName))
+        // 若修改品种名，则检查是否存在同名记录，有则取消更新
+        if (tempCatBreed!.BreedName != item.BreedName 
+            && await dbContext.CatBreed.AnyAsync(o => o.BreedName == item.BreedName))
         {
             Snackbar.Add("猫咪品种不可重复！", Severity.Error);
             dbContext.ChangeTracker.Clear();
