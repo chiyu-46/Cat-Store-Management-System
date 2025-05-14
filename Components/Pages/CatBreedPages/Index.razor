@@ -19,12 +19,15 @@
     <ToolBarContent>
         <MudText Typo="Typo.h6">品种管理</MudText>
         <MudSpacer/>
-        <MudButton @onclick="AddCatBreedAsync" Variant="Variant.Filled" Color="Color.Success">添加品种</MudButton>
+        @if (!readOnly)
+        {
+            <MudButton @onclick="AddCatBreedAsync" Variant="Variant.Filled" Color="Color.Success">添加品种</MudButton>
+        }
     </ToolBarContent>
     <Columns>
         <PropertyColumn Property="o =>o.BreedName" Title="品种名称"/>
-        <PropertyColumn Property="o => o.Remark" Title="备注" />
-        
+        <PropertyColumn Property="o => o.Remark" Title="备注"/>
+
         <TemplateColumn>
             <CellTemplate>
                 <MudStack Row>
@@ -50,6 +53,7 @@
     // 可用于根据授权确定用户是否有权限更改此表格内容。
     // 可以使用 Editable 属性，控制单独的列是否可编辑。
     private bool readOnly = false;
+
     // 记录用户修改品种时的原始副本
     private CatBreed? tempCatBreed;
 
@@ -99,7 +103,7 @@
     private async Task CommittedItemChangesAsync(CatBreed item)
     {
         // 若修改品种名，则检查是否存在同名记录，有则取消更新
-        if (tempCatBreed!.BreedName != item.BreedName 
+        if (tempCatBreed!.BreedName != item.BreedName
             && await dbContext.CatBreed.AnyAsync(o => o.BreedName == item.BreedName))
         {
             Snackbar.Add("猫咪品种不可重复！", Severity.Error);
@@ -107,6 +111,7 @@
             StateHasChanged();
             return;
         }
+
         try
         {
             await dbContext.SaveChangesAsync();
@@ -133,6 +138,7 @@
             Snackbar.Add("当前品种已有猫咪存在，禁止删除！", Severity.Error);
             return;
         }
+
         bool? result = await DialogService.ShowMessageBox(
             "警告",
             "删除后无法恢复！",

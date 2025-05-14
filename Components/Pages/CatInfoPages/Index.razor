@@ -16,14 +16,17 @@
     <ToolBarContent>
         <MudText Typo="Typo.h6">猫咪管理</MudText>
         <MudSpacer/>
-        <MudButton @onclick="AddCatInfoAsync" Variant="Variant.Filled" Color="Color.Success">添加新猫咪</MudButton>
+        @if (!readOnly)
+        {
+            <MudButton @onclick="AddCatInfoAsync" Variant="Variant.Filled" Color="Color.Success">添加新猫咪</MudButton>
+        }
     </ToolBarContent>
     <Columns>
         <PropertyColumn Property="catInfo => catInfo.Name" Title="名字"/>
-        <PropertyColumn Property="catInfo => catInfo.GetNaturalGender()" Title="性别" />
+        <PropertyColumn Property="catInfo => catInfo.GetNaturalGender()" Title="性别"/>
         <PropertyColumn Property="catInfo => catInfo.CatBreed.BreedName" Title="品种"/>
-        <PropertyColumn Property="catInfo => catInfo.Birthday" Title="出生日" />
-        <PropertyColumn Property="catInfo => catInfo.GetNaturalCatState()" Title="状态" />
+        <PropertyColumn Property="catInfo => catInfo.Birthday" Title="出生日"/>
+        <PropertyColumn Property="catInfo => catInfo.GetNaturalCatState()" Title="状态"/>
         <TemplateColumn>
             <CellTemplate>
                 <MudStack Row>
@@ -42,7 +45,7 @@
 
 @code {
     private MudDataGrid<CatInfo> dataGrid = default!;
-    
+
     [CascadingParameter] private Task<AuthenticationState>? authenticationState { get; set; }
 
     private CatStoreContext dbContext = default!;
@@ -107,7 +110,7 @@
             Items = pagedData
         };
     }
-    
+
     /// <summary>
     /// 当用户点击删除按钮时触发，用于弹出删除确认对话框。
     /// </summary>

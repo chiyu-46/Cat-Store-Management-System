@@ -18,7 +18,12 @@
     <ToolBarContent>
         <MudText Typo="Typo.h6">商品库存管理</MudText>
         <MudSpacer/>
-        <MudButton @onclick="AddCommodityAsync" Variant="Variant.Filled" Color="Color.Success">添加新商品</MudButton>
+        @if (!readOnly)
+        {
+            <MudButton @onclick="AddCommodityAsync" Variant="Variant.Filled" Color="Color.Success">
+                添加新商品
+            </MudButton>
+        }
     </ToolBarContent>
     <Columns>
         <PropertyColumn Property="commodity => commodity.Brand" Title="品牌"/>
@@ -61,7 +66,7 @@
     private CatStoreContext dbContext = default!;
 
     [CascadingParameter] private Task<AuthenticationState>? authenticationState { get; set; }
-    
+
     // 此表格是否只读。
     // 可用于根据授权确定用户是否有权限更改此表格内容。
     // 可以使用 Editable 属性，控制单独的列是否可编辑。
@@ -128,7 +133,7 @@
     private async Task OnDeleteButtonClickedAsync(Commodity? item)
     {
         // 如果此商品有关联的订单，则禁止删除
-        if (dbContext.OrderItem.Any(x => x.CommodityId == item!.Id) 
+        if (dbContext.OrderItem.Any(x => x.CommodityId == item!.Id)
             || dbContext.PurchaseOrderItem.Any(x => x.CommodityId == item!.Id))
         {
             Snackbar.Add("此商品存在关联订单，无法删除！", Severity.Error);
